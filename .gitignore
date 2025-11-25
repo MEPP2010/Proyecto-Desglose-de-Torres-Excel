@@ -1,0 +1,35 @@
+# Dependencias
+node_modules/
+
+# Build
+.next/
+
+# Scripts y archivos temporales
+csv-mongodb.py
+clean-json-file.js
+migrate-to-mongodb.js
+import-json-mongodb.js
+
+# Archivos de datos
+DATOS_CONSOLIDADOS_TORRES.csv
+PROYECTO_DESGLOSE_TORRES_martin.xlsx
+desgloses_mongodb.json
+desgloses_mongodb_clean.json
+desglose_torres.db.backup
+
+# Archivos de base de datos local
+*.db
+*.db.backup
+
+# Logs
+*.log
+npm-debug.log*
+
+# Variables de entorno
+.env
+.env.local
+.env.production
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
