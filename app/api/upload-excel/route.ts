@@ -52,31 +52,12 @@ export async function POST(request: NextRequest) {
     // Definir rutas
     const dataDir = join(process.cwd(), 'data');
     const targetPath = join(dataDir, 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
-    const backupPath = join(dataDir, `PROYECTO_DESGLOSE_TORRES_martin_backup_${Date.now()}.xlsx`);
-
-    // Crear backup del archivo actual si existe
-    if (existsSync(targetPath)) {
-      try {
-        renameSync(targetPath, backupPath);
-        console.log(`📦 Backup creado: ${backupPath}`);
-      } catch (error) {
-        console.error('⚠️ No se pudo crear backup:', error);
-        // Continuamos aunque falle el backup
-      }
-    }
 
     // Guardar el nuevo archivo
     try {
       writeFileSync(targetPath, buffer);
       console.log(`✅ Archivo guardado exitosamente: ${targetPath}`);
     } catch (error) {
-      // Si falla, restaurar el backup
-      if (existsSync(backupPath)) {
-        renameSync(backupPath, targetPath);
-        console.log('↩️ Backup restaurado debido a error');
-      }
-      throw error;
-    }
 
     // Forzar recarga de datos (limpiando el caché)
     const { loadExcelData } = await import('@/lib/excel-database');
@@ -95,7 +76,9 @@ export async function POST(request: NextRequest) {
       }
     });
 
-  } catch (error) {
+  } 
+  
+    } catch (error) {
     console.error('❌ API /api/upload-excel - ERROR:', error);
     return NextResponse.json(
       {
