@@ -1,8 +1,10 @@
+// app/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PlanoViewer, { usePlanoViewer } from '@/components/PlanoViewer';
+import UploadExcelModal from '@/components/UploadExcelModal';
 
 interface Piece {
   id_item: string;
@@ -53,6 +55,7 @@ export default function BuscadorPage() {
   const [results, setResults] = useState<Piece[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('Seleccione filtros para buscar');
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   // Hook para el visualizador de planos
   const { isOpen, planoUrl, planoName, openViewer, closeViewer } = usePlanoViewer();
@@ -131,6 +134,11 @@ export default function BuscadorPage() {
     openViewer(planoUrl, planoTitle);
   };
 
+  const handleUploadSuccess = () => {
+    // Recargar la página completa para obtener los nuevos datos
+    window.location.reload();
+  };
+
   return (
     <div className="p-4 sm:p-8 min-h-screen flex flex-col items-center w-full">
       
@@ -138,7 +146,7 @@ export default function BuscadorPage() {
       <div className="w-full max-w-7xl bg-white/90 backdrop-blur-md p-6 sm:p-10 rounded-2xl shadow-2xl border border-white/40 mt-4 mb-20 relative z-20">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-gray-300 pb-4 gap-4">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 border-b border-gray-300 pb-4 gap-4">
           <div>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-[#003594]">
               Buscador de Materiales
@@ -146,13 +154,25 @@ export default function BuscadorPage() {
             <p className="text-gray-500 text-sm mt-1">Sistema de gestión de torres de transmisión</p>
           </div>
           
-          <Link
-            href="/calculadora"
-            className="group bg-[#ff6600] hover:bg-[#e65c00] text-white transition-all duration-200 font-bold py-3 px-6 rounded-xl shadow-lg flex items-center gap-2 hover:-translate-y-1"
-          >
-            <span>Calculadora de Torres</span>
-            <span className="group-hover:translate-x-1 transition-transform">➡️</span>
-          </Link>
+          <div className="flex gap-3 flex-wrap">
+            {/* Botón Actualizar Desglose */}
+            <button
+              onClick={() => setUploadModalOpen(true)}
+              className="group bg-green-600 hover:bg-green-700 text-white transition-all duration-200 font-bold py-3 px-6 rounded-xl shadow-lg flex items-center gap-2 hover:-translate-y-1"
+            >
+              <span>📤</span>
+              <span>Actualizar Desglose</span>
+            </button>
+
+            {/* Botón Calculadora */}
+            <Link
+              href="/calculadora"
+              className="group bg-[#ff6600] hover:bg-[#e65c00] text-white transition-all duration-200 font-bold py-3 px-6 rounded-xl shadow-lg flex items-center gap-2 hover:-translate-y-1"
+            >
+              <span>Calculadora de Torres</span>
+              <span className="group-hover:translate-x-1 transition-transform">➡️</span>
+            </Link>
+          </div>
         </div>
 
         {/* Filtros */}
@@ -246,6 +266,13 @@ export default function BuscadorPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Upload */}
+      <UploadExcelModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onSuccess={handleUploadSuccess}
+      />
 
       {/* Visualizador Modal */}
       {isOpen && (
