@@ -1,6 +1,6 @@
 // app/api/upload-excel/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFileSync, existsSync, renameSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { join } from 'path';
 import * as XLSX from 'xlsx';
 
@@ -53,32 +53,48 @@ export async function POST(request: NextRequest) {
     const dataDir = join(process.cwd(), 'data');
     const targetPath = join(dataDir, 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
 
-    // Guardar el nuevo archivo
+    // Guardar el nuevo archivo (sobrescribir directamente)
     try {
       writeFileSync(targetPath, buffer);
       console.log(`✅ Archivo guardado exitosamente: ${targetPath}`);
     } catch (error) {
+      console.error('❌ Error al guardar archivo:', error);
+      throw error;
+    }
 
     // Forzar recarga de datos (limpiando el caché)
-    const { loadExcelData } = await import('@/lib/excel-database');
-    const newData = loadExcelData(true);
-    
-    console.log(`✅ Datos recargados: ${newData.length} registros`);
+    try {
+      const { loadExcelData } = await import('@/lib/excel-database');
+      const newData = loadExcelData(true);
+      
+      console.log(`✅ Datos recargados: ${newData.length} registros`);
 
-    return NextResponse.json({
-      success: true,
-      message: 'Archivo actualizado exitosamente',
-      stats: {
-        totalRecords: newData.length,
-        fileName: file.name,
-        fileSize: `${(file.size / 1024).toFixed(2)} KB`,
-        uploadedAt: new Date().toISOString()
-      }
-    });
+      return NextResponse.json({
+        success: true,
+        message: 'Archivo actualizado exitosamente',
+        stats: {
+          totalRecords: newData.length,
+          fileName: file.name,
+          fileSize: `${(file.size / 1024).toFixed(2)} KB`,
+          uploadedAt: new Date().toISOString()
+        }
+      });
+    } catch (reloadError) {
+      console.error('⚠️ Error al recargar datos:', reloadError);
+      // Aún así retornar éxito porque el archivo fue guardado
+      return NextResponse.json({
+        success: true,
+        message: 'Archivo actualizado exitosamente (recarga manual requerida)',
+        stats: {
+          totalRecords: 0,
+          fileName: file.name,
+          fileSize: `${(file.size / 1024).toFixed(2)} KB`,
+          uploadedAt: new Date().toISOString()
+        }
+      });
+    }
 
-  } 
-  
-    } catch (error) {
+  } catch (error) {
     console.error('❌ API /api/upload-excel - ERROR:', error);
     return NextResponse.json(
       {

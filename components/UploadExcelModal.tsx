@@ -117,7 +117,7 @@ export default function UploadExcelModal({ isOpen, onClose, onSuccess }: UploadE
             <span>📤</span> Actualizar Desglose de Torres
           </h2>
           <p className="text-gray-600 text-sm">
-            Selecciona un nuevo archivo Excel para actualizar la base de datos. El archivo actual se respaldará automáticamente.
+            Selecciona un nuevo archivo Excel para actualizar la base de datos.
           </p>
         </div>
 
@@ -169,7 +169,6 @@ export default function UploadExcelModal({ isOpen, onClose, onSuccess }: UploadE
             <div>
               <p className="font-semibold text-yellow-800 mb-1">Importante:</p>
               <ul className="text-sm text-yellow-700 space-y-1">
-                <li>• Se creará un respaldo automático del archivo actual</li>
                 <li>• El nuevo archivo reemplazará completamente los datos existentes</li>
                 <li>• Asegúrate de que el archivo tenga el formato correcto</li>
                 <li>• La página se recargará automáticamente después de la actualización</li>
