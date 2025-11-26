@@ -1,7 +1,8 @@
-// app/api/upload-excel/route.ts
+// app/api/upload-excel/route.ts - VERSIÓN MEJORADA
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import * as XLSX from 'xlsx';
+import { invalidateCache } from '@/lib/excel-database';
 
 export async function POST(request: NextRequest) {
   console.log('\n🌐 API /api/upload-excel - REQUEST (POST)');
@@ -57,14 +58,19 @@ export async function POST(request: NextRequest) {
       
       console.log(`✅ Archivo subido a Blob Storage: ${blob.url}`);
 
+      // ⭐ INVALIDAR EL CACHE INMEDIATAMENTE ⭐
+      invalidateCache();
+      console.log('🔄 Cache invalidado - próxima petición cargará datos nuevos');
+
       return NextResponse.json({
         success: true,
-        message: 'Archivo actualizado exitosamente en Vercel Blob Storage',
+        message: 'Archivo actualizado exitosamente. Los cambios se verán reflejados de inmediato.',
         stats: {
           blobUrl: blob.url,
           fileName: file.name,
           fileSize: `${(file.size / 1024).toFixed(2)} KB`,
-          uploadedAt: new Date().toISOString()
+          uploadedAt: new Date().toISOString(),
+          cacheInvalidated: true
         }
       });
     } catch (blobError) {

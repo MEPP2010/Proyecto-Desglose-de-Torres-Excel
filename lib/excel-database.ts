@@ -75,6 +75,13 @@ const COLUMN_MAPPING: Record<string, string> = {
   'Mod Plano': 'mod_plano'
 };
 
+
+export function invalidateCache(): void {
+  console.log('🗑️ Cache invalidado');
+  cachedData = null;
+  lastLoadTime = 0;
+}
+
 /**
  * Carga el archivo Excel desde Vercel Blob Storage o local
  */
