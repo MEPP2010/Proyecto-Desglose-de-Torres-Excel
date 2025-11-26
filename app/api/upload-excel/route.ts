@@ -1,12 +1,9 @@
 // app/api/upload-excel/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+import { put } from '@vercel/blob';
 import * as XLSX from 'xlsx';
 
 export async function POST(request: NextRequest) {
-  console.log('\n🌐 API /api/upload-excel - REQUEST (POST)');
-  
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -18,7 +15,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validar que sea un archivo Excel
+    // Validar extensión
     const fileName = file.name.toLowerCase();
     if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
       return NextResponse.json(
@@ -27,79 +24,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Leer el archivo como buffer
+    // Validar contenido Excel
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-
-    // Validar que el archivo sea un Excel válido
-    try {
-      const workbook = XLSX.read(buffer, { type: 'buffer' });
-      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-        return NextResponse.json(
-          { success: false, message: 'El archivo Excel no contiene hojas válidas' },
-          { status: 400 }
-        );
-      }
-      console.log(`✅ Archivo válido con ${workbook.SheetNames.length} hojas`);
-    } catch (error) {
-      console.error('❌ Error al validar Excel:', error);
+    
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
       return NextResponse.json(
-        { success: false, message: 'El archivo no es un Excel válido' },
+        { success: false, message: 'El archivo Excel no contiene hojas válidas' },
         { status: 400 }
       );
     }
 
-    // Definir rutas
-    const dataDir = join(process.cwd(), 'data');
-    const targetPath = join(dataDir, 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
+    // Subir a Blob Storage
+    const blob = await put('PROYECTO_DESGLOSE_TORRES.xlsx', file, {
+      access: 'public',
+      addRandomSuffix: false,
+    });
+    
+    console.log(`✅ Archivo subido: ${blob.url}`);
 
-    // Guardar el nuevo archivo (sobrescribir directamente)
-    try {
-      writeFileSync(targetPath, buffer);
-      console.log(`✅ Archivo guardado exitosamente: ${targetPath}`);
-    } catch (error) {
-      console.error('❌ Error al guardar archivo:', error);
-      throw error;
-    }
+    // Guardar URL en variable de entorno o base de datos
+    // Para persistir entre deploys, usa KV o base de datos
+    process.env.EXCEL_BLOB_URL = blob.url;
 
-    // Forzar recarga de datos (limpiando el caché)
-    try {
-      const { loadExcelData } = await import('@/lib/excel-database');
-      const newData = loadExcelData(true);
-      
-      console.log(`✅ Datos recargados: ${newData.length} registros`);
-
-      return NextResponse.json({
-        success: true,
-        message: 'Archivo actualizado exitosamente',
-        stats: {
-          totalRecords: newData.length,
-          fileName: file.name,
-          fileSize: `${(file.size / 1024).toFixed(2)} KB`,
-          uploadedAt: new Date().toISOString()
-        }
-      });
-    } catch (reloadError) {
-      console.error('⚠️ Error al recargar datos:', reloadError);
-      // Aún así retornar éxito porque el archivo fue guardado
-      return NextResponse.json({
-        success: true,
-        message: 'Archivo actualizado exitosamente (recarga manual requerida)',
-        stats: {
-          totalRecords: 0,
-          fileName: file.name,
-          fileSize: `${(file.size / 1024).toFixed(2)} KB`,
-          uploadedAt: new Date().toISOString()
-        }
-      });
-    }
+    return NextResponse.json({
+      success: true,
+      message: 'Archivo actualizado exitosamente',
+      stats: {
+        blobUrl: blob.url,
+        fileName: file.name,
+        fileSize: `${(file.size / 1024).toFixed(2)} KB`,
+        uploadedAt: new Date().toISOString()
+      }
+    });
 
   } catch (error) {
-    console.error('❌ API /api/upload-excel - ERROR:', error);
+    console.error('❌ Error:', error);
     return NextResponse.json(
       {
         success: false,
-        message: `Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`
+        message: `Error: ${error instanceof Error ? error.message : 'Error desconocido'}`
       },
       { status: 500 }
     );
