@@ -19,7 +19,7 @@ export interface Piece {
   peso_unitario: number;
   plano: string;
   mod_plano: string;
-  hoja_origen: string; // Nombre de la hoja de donde viene
+  hoja_origen: string;
 }
 
 export interface CalculatedPiece {
@@ -37,7 +37,7 @@ export interface CalculatedPiece {
   mod_plano: string;
 }
 
-// Sets para división de partes (mismo que en MongoDB)
+// Sets para división de partes
 export const PARTS_DIV_2 = new Set([
   'BGDA', 'BSUP', 'BMED', 'BINF', 'BDER', 'BIZQ', 'BSUP/MED'
 ]);
@@ -53,35 +53,17 @@ let lastLoadTime: number = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
 /**
- * Mapea los nombres de columnas del Excel a nuestros campos internos
- * Basado en los encabezados reales del archivo
+ * Invalida el cache forzando una recarga en la próxima petición
  */
-const COLUMN_MAPPING: Record<string, string> = {
-  'ID Item': 'id_item',
-  'Texto breve del material': 'texto_breve',
-  'TIPO': 'tipo',
-  'FABRICANTE': 'fabricante',
-  'Cabeza': 'cabeza',
-  'Parte (Division)': 'parte_division',
-  'Cuerpo': 'cuerpo',
-  'Tramo': 'tramo',
-  'Posición': 'posicion',
-  'Descripción': 'descripcion',
-  'Long 1': 'long_1',
-  'Long 2 (Principal)': 'long_2_principal',
-  'Cantidad x Torre': 'cantidad_x_torre',
-  'Peso Unitario': 'peso_unitario',
-  'PLANO': 'plano',
-  'Mod Plano': 'mod_plano'
-};
-
-
 export function invalidateCache(): void {
   console.log('🗑️ Cache invalidado');
   cachedData = null;
   lastLoadTime = 0;
 }
 
+/**
+ * Obtiene información del estado del cache
+ */
 export function getCacheInfo() {
   const now = Date.now();
   const timeInCache = cachedData ? now - lastLoadTime : 0;
@@ -98,54 +80,35 @@ export function getCacheInfo() {
 }
 
 /**
- * Carga el archivo Excel desde Vercel Blob Storage o local
- * NOTA: Esta es la versión sincrónica (legacy). Se recomienda usar loadExcelDataAsync()
+ * Carga el archivo Excel (versión síncrona - solo desarrollo local)
  */
 export function loadExcelData(forceReload = false): Piece[] {
   const now = Date.now();
   
-  // Retornar cache si es válido
   if (!forceReload && cachedData && (now - lastLoadTime) < CACHE_TTL) {
     console.log('📦 Usando datos en caché');
     return cachedData;
   }
 
-  console.log('📂 Cargando datos desde Excel (modo síncrono - solo para desarrollo local)...');
+  console.log('📂 Cargando datos desde Excel (desarrollo local)...');
   
   try {
-    let fileBuffer: Buffer;
-    
-    // Solo funciona en desarrollo local (no en Vercel)
-    console.log('💻 Cargando desde archivo local...');
     const excelPath = join(process.cwd(), 'data', 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
-    fileBuffer = readFileSync(excelPath);
+    const fileBuffer = readFileSync(excelPath);
     
-    // Leer el workbook desde el buffer
     const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-    
     const allData: Piece[] = [];
     
-    // Procesar cada hoja
     workbook.SheetNames.forEach(sheetName => {
-      console.log(`  📄 Procesando hoja: ${sheetName}`);
-      
       const worksheet = workbook.Sheets[sheetName];
-      
-      // Leer como arrays para encontrar la fila de encabezados
       const rawData = XLSX.utils.sheet_to_json(worksheet, { 
-        header: 1,  // Retorna arrays en lugar de objetos
+        header: 1,
         raw: false,
         defval: ''
       }) as any[][];
       
-      console.log(`     📊 Total de filas (raw): ${rawData.length}`);
+      if (rawData.length === 0) return;
       
-      if (rawData.length === 0) {
-        console.log(`     ⚠️ Hoja sin datos - omitiendo`);
-        return;
-      }
-      
-      // Encontrar la fila de encabezados
       let headerRowIndex = -1;
       let headers: string[] = [];
       
@@ -153,99 +116,55 @@ export function loadExcelData(forceReload = false): Piece[] {
         const row = rawData[i];
         const rowStr = row.join('|').toUpperCase();
         
-        // Buscar palabras clave en los encabezados
-        if (rowStr.includes('ID ITEM') || 
-            rowStr.includes('FABRICANTE') || 
-            rowStr.includes('PARTE') ||
-            (rowStr.includes('TIPO') && rowStr.includes('CABEZA'))) {
+        if (rowStr.includes('ID ITEM') || rowStr.includes('FABRICANTE') || 
+            rowStr.includes('PARTE') || (rowStr.includes('TIPO') && rowStr.includes('CABEZA'))) {
           headerRowIndex = i;
           headers = row.map(cell => String(cell || '').trim());
-          console.log(`     📋 Encabezados encontrados en fila ${i + 1}`);
           break;
         }
       }
       
-      if (headerRowIndex === -1) {
-        console.log(`     ⚠️ No se encontraron encabezados válidos - omitiendo hoja`);
-        return;
-      }
+      if (headerRowIndex === -1) return;
       
-      console.log(`     📋 Columnas: ${headers.filter(h => h).length} encabezados válidos`);
-      
-      // Extraer TIPO y FABRICANTE del nombre de la hoja
       const [tipo, fabricante] = extractTipoFabricante(sheetName);
-      console.log(`     🏷️  TIPO: "${tipo}", FABRICANTE: "${fabricante}"`);
       
-      let rowsAdded = 0;
-      let rowsSkipped = 0;
-      
-      // Procesar filas de datos (después de los encabezados)
       for (let i = headerRowIndex + 1; i < rawData.length; i++) {
         const rowArray = rawData[i];
-        
-        // Crear objeto con los datos de la fila
         const row: any = {};
         headers.forEach((header, index) => {
-          if (header) {
-            row[header] = rowArray[index] || '';
-          }
+          if (header) row[header] = rowArray[index] || '';
         });
         
-        // Función para buscar columnas con nombres variables
         const getColumnValue = (possibleNames: string[]) => {
           for (const name of possibleNames) {
-            // Buscar exacto
-            if (row[name] !== undefined) {
-              return row[name];
-            }
-            // Buscar case-insensitive
+            if (row[name] !== undefined) return row[name];
             const foundKey = Object.keys(row).find(k => 
               k.toLowerCase() === name.toLowerCase()
             );
-            if (foundKey) {
-              return row[foundKey];
-            }
+            if (foundKey) return row[foundKey];
           }
           return '';
         };
         
-        const idItem = getColumnValue(['ID Item', 'IDItem', 'ID_Item', 'Material']);
-        const textoBrev = getColumnValue(['Texto breve del material', 'Texto breve', 'TextoBreve', 'Texto']);
-        const tipoCol = getColumnValue(['TIPO', 'Tipo', 'tipo']);
-        const fabricanteCol = getColumnValue(['FABRICANTE', 'Fabricante', 'fabricante']);
-        const cabezaCol = getColumnValue(['Cabeza', 'cabeza']);
-        const parteDiv = getColumnValue(['Parte (Division)', 'Parte', 'Division', 'Parte_Division', 'Parte(Division)']);
-        const cuerpoCol = getColumnValue(['Cuerpo', 'cuerpo']);
-        const tramoCol = getColumnValue(['Tramo', 'tramo']);
-        const posicionCol = getColumnValue(['Posición', 'Posicion', 'posicion', 'Pos']);
-        const descripcionCol = getColumnValue(['Descripción', 'Descripcion', 'descripcion']);
-        const long1Col = getColumnValue(['Long 1', 'Long1', 'Long_1']);
-        const long2Col = getColumnValue(['Long 2 (Principal)', 'Long 2', 'Long2', 'Long_2', 'Long 2(Principal)']);
-        const cantidadCol = getColumnValue(['Cantidad x Torre', 'Cantidad', 'Cant x Torre', 'Cant', 'Cantidad Torre']);
-        const pesoCol = getColumnValue(['Peso Unitario', 'Peso', 'PesoUnitario', 'Peso Unit']);
-        const planoCol = getColumnValue(['PLANO', 'Plano', 'plano']);
-        const modPlanoCol = getColumnValue(['Mod Plano', 'ModPlano', 'Mod_Plano']);
-        
         const piece: Piece = {
-          id_item: normalizeValue(idItem),
-          texto_breve: normalizeValue(textoBrev),
-          tipo: tipo || normalizeValue(tipoCol),
-          fabricante: fabricante || normalizeValue(fabricanteCol),
-          cabeza: normalizeValue(cabezaCol),
-          parte_division: normalizeValue(parteDiv),
-          cuerpo: normalizeValue(cuerpoCol),
-          tramo: normalizeValue(tramoCol),
-          posicion: normalizeValue(posicionCol),
-          descripcion: normalizeValue(descripcionCol),
-          long_2_principal: normalizeValue(long2Col),
-          cantidad_x_torre: parseNumber(cantidadCol),
-          peso_unitario: parseNumber(pesoCol),
-          plano: normalizeValue(planoCol),
-          mod_plano: normalizeValue(modPlanoCol),
+          id_item: normalizeValue(getColumnValue(['ID Item', 'IDItem', 'ID_Item', 'Material'])),
+          texto_breve: normalizeValue(getColumnValue(['Texto breve del material', 'Texto breve', 'TextoBreve', 'Texto'])),
+          tipo: tipo || normalizeValue(getColumnValue(['TIPO', 'Tipo', 'tipo'])),
+          fabricante: fabricante || normalizeValue(getColumnValue(['FABRICANTE', 'Fabricante', 'fabricante'])),
+          cabeza: normalizeValue(getColumnValue(['Cabeza', 'cabeza'])),
+          parte_division: normalizeValue(getColumnValue(['Parte (Division)', 'Parte', 'Division', 'Parte_Division', 'Parte(Division)'])),
+          cuerpo: normalizeValue(getColumnValue(['Cuerpo', 'cuerpo'])),
+          tramo: normalizeValue(getColumnValue(['Tramo', 'tramo'])),
+          posicion: normalizeValue(getColumnValue(['Posición', 'Posicion', 'posicion', 'Pos'])),
+          descripcion: normalizeValue(getColumnValue(['Descripción', 'Descripcion', 'descripcion'])),
+          long_2_principal: normalizeValue(getColumnValue(['Long 2 (Principal)', 'Long 2', 'Long2', 'Long_2', 'Long 2(Principal)'])),
+          cantidad_x_torre: parseNumber(getColumnValue(['Cantidad x Torre', 'Cantidad', 'Cant x Torre', 'Cant', 'Cantidad Torre'])),
+          peso_unitario: parseNumber(getColumnValue(['Peso Unitario', 'Peso', 'PesoUnitario', 'Peso Unit'])),
+          plano: normalizeValue(getColumnValue(['PLANO', 'Plano', 'plano'])),
+          mod_plano: normalizeValue(getColumnValue(['Mod Plano', 'ModPlano', 'Mod_Plano'])),
           hoja_origen: sheetName
         };
         
-        // Solo agregar si tiene datos mínimos válidos
         const hasMinimumData = 
           (piece.id_item && piece.id_item !== '-') || 
           (piece.parte_division && piece.parte_division !== '-') ||
@@ -253,18 +172,10 @@ export function loadExcelData(forceReload = false): Piece[] {
         
         if (hasMinimumData) {
           allData.push(piece);
-          rowsAdded++;
-        } else {
-          rowsSkipped++;
         }
       }
-      
-      console.log(`     ✅ ${rowsAdded} filas agregadas, ${rowsSkipped} omitidas`);
     });
     
-    console.log(`✅ Cargadas ${allData.length} piezas de ${workbook.SheetNames.length} hojas`);
-    
-    // Actualizar cache
     cachedData = allData;
     lastLoadTime = now;
     
@@ -277,13 +188,11 @@ export function loadExcelData(forceReload = false): Piece[] {
 }
 
 /**
- * Versión ASYNC de loadExcelData (RECOMENDADA)
- * Incluye cache busting para reflejar cambios inmediatamente
+ * Versión ASYNC con cache busting (USAR EN PRODUCCIÓN)
  */
 export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> {
   const now = Date.now();
   
-  // Retornar cache si es válido
   if (!forceReload && cachedData && (now - lastLoadTime) < CACHE_TTL) {
     console.log('📦 Usando datos en caché');
     return cachedData;
@@ -293,22 +202,16 @@ export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> 
   
   try {
     let fileBuffer: Buffer;
-    
-    // Verificar si estamos en producción (Vercel) o desarrollo local
     const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
     
     if (isProduction && process.env.EXCEL_BLOB_URL) {
-      // PRODUCCIÓN: Cargar desde Vercel Blob Storage
       console.log('☁️ Cargando desde Vercel Blob Storage...');
       
-      // ⭐ CACHE BUSTING: Agregar timestamp aleatorio para evitar cache ⭐
+      // ⭐ CACHE BUSTING ⭐
       const cacheBuster = `?cb=${Date.now()}&r=${Math.random().toString(36).substring(7)}`;
       const url = process.env.EXCEL_BLOB_URL + cacheBuster;
       
-      console.log(`   🔗 URL: ${url.substring(0, 100)}...`);
-      
       const response = await fetch(url, {
-        // ⭐ FORZAR NO USAR CACHE DEL NAVEGADOR/CDN ⭐
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
@@ -318,29 +221,23 @@ export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> 
       });
       
       if (!response.ok) {
-        throw new Error(`Error al descargar archivo: ${response.status} ${response.statusText}`);
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
       }
       
       const arrayBuffer = await response.arrayBuffer();
       fileBuffer = Buffer.from(arrayBuffer);
-      console.log(`   ✅ Descargado exitosamente: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
+      console.log(`   ✅ Descargado: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
       
     } else {
-      // DESARROLLO: Cargar desde sistema de archivos local
       console.log('💻 Cargando desde archivo local...');
       const excelPath = join(process.cwd(), 'data', 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
       fileBuffer = readFileSync(excelPath);
     }
     
-    // Leer el workbook desde el buffer
     const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-    
     const allData: Piece[] = [];
     
-    // Procesar cada hoja (mismo código que antes)
     workbook.SheetNames.forEach(sheetName => {
-      console.log(`  📄 Procesando hoja: ${sheetName}`);
-      
       const worksheet = workbook.Sheets[sheetName];
       const rawData = XLSX.utils.sheet_to_json(worksheet, { 
         header: 1,
@@ -350,7 +247,6 @@ export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> 
       
       if (rawData.length === 0) return;
       
-      // Encontrar encabezados
       let headerRowIndex = -1;
       let headers: string[] = [];
       
@@ -358,10 +254,8 @@ export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> 
         const row = rawData[i];
         const rowStr = row.join('|').toUpperCase();
         
-        if (rowStr.includes('ID ITEM') || 
-            rowStr.includes('FABRICANTE') || 
-            rowStr.includes('PARTE') ||
-            (rowStr.includes('TIPO') && rowStr.includes('CABEZA'))) {
+        if (rowStr.includes('ID ITEM') || rowStr.includes('FABRICANTE') || 
+            rowStr.includes('PARTE') || (rowStr.includes('TIPO') && rowStr.includes('CABEZA'))) {
           headerRowIndex = i;
           headers = row.map(cell => String(cell || '').trim());
           break;
@@ -372,7 +266,6 @@ export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> 
       
       const [tipo, fabricante] = extractTipoFabricante(sheetName);
       
-      // Procesar filas
       for (let i = headerRowIndex + 1; i < rawData.length; i++) {
         const rowArray = rawData[i];
         const row: any = {};
@@ -421,9 +314,6 @@ export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> 
       }
     });
     
-    console.log(`✅ Cargadas ${allData.length} piezas de ${workbook.SheetNames.length} hojas`);
-    
-    // Actualizar cache
     cachedData = allData;
     lastLoadTime = now;
     
@@ -432,7 +322,6 @@ export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> 
   } catch (error) {
     console.error('❌ Error al cargar Excel:', error);
     
-    // Si hay cache viejo, usarlo como fallback
     if (cachedData && cachedData.length > 0) {
       console.warn('⚠️ Usando cache antiguo como fallback');
       return cachedData;
@@ -441,150 +330,11 @@ export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> 
     throw new Error(`No se pudo cargar el archivo Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
   }
 }
-  const now = Date.now();
-  
-  // Retornar cache si es válido
-  if (!forceReload && cachedData && (now - lastLoadTime) < CACHE_TTL) {
-    console.log('📦 Usando datos en caché');
-    return cachedData;
-  }
-
-  console.log('📂 Cargando datos desde Excel...');
-  
-  try {
-    let fileBuffer: Buffer;
-    
-    // Verificar si estamos en producción (Vercel) o desarrollo local
-    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
-    
-    if (isProduction && process.env.EXCEL_BLOB_URL) {
-      // PRODUCCIÓN: Cargar desde Vercel Blob Storage
-      console.log('☁️ Cargando desde Vercel Blob Storage...');
-      const response = await fetch(process.env.EXCEL_BLOB_URL);
-      
-      if (!response.ok) {
-        throw new Error(`Error al descargar archivo: ${response.status} ${response.statusText}`);
-      }
-      
-      const arrayBuffer = await response.arrayBuffer();
-      fileBuffer = Buffer.from(arrayBuffer);
-      console.log(`   ✅ Descargado: ${fileBuffer.length} bytes`);
-      
-    } else {
-      // DESARROLLO: Cargar desde sistema de archivos local
-      console.log('💻 Cargando desde archivo local...');
-      const excelPath = join(process.cwd(), 'data', 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
-      fileBuffer = readFileSync(excelPath);
-    }
-    
-    // Leer el workbook desde el buffer
-    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-    
-    const allData: Piece[] = [];
-    
-    // Procesar cada hoja (mismo código que antes)
-    workbook.SheetNames.forEach(sheetName => {
-      console.log(`  📄 Procesando hoja: ${sheetName}`);
-      
-      const worksheet = workbook.Sheets[sheetName];
-      const rawData = XLSX.utils.sheet_to_json(worksheet, { 
-        header: 1,
-        raw: false,
-        defval: ''
-      }) as any[][];
-      
-      if (rawData.length === 0) return;
-      
-      // Encontrar encabezados
-      let headerRowIndex = -1;
-      let headers: string[] = [];
-      
-      for (let i = 0; i < Math.min(10, rawData.length); i++) {
-        const row = rawData[i];
-        const rowStr = row.join('|').toUpperCase();
-        
-        if (rowStr.includes('ID ITEM') || 
-            rowStr.includes('FABRICANTE') || 
-            rowStr.includes('PARTE') ||
-            (rowStr.includes('TIPO') && rowStr.includes('CABEZA'))) {
-          headerRowIndex = i;
-          headers = row.map(cell => String(cell || '').trim());
-          break;
-        }
-      }
-      
-      if (headerRowIndex === -1) return;
-      
-      const [tipo, fabricante] = extractTipoFabricante(sheetName);
-      
-      // Procesar filas
-      for (let i = headerRowIndex + 1; i < rawData.length; i++) {
-        const rowArray = rawData[i];
-        const row: any = {};
-        headers.forEach((header, index) => {
-          if (header) row[header] = rowArray[index] || '';
-        });
-        
-        const getColumnValue = (possibleNames: string[]) => {
-          for (const name of possibleNames) {
-            if (row[name] !== undefined) return row[name];
-            const foundKey = Object.keys(row).find(k => 
-              k.toLowerCase() === name.toLowerCase()
-            );
-            if (foundKey) return row[foundKey];
-          }
-          return '';
-        };
-        
-        const piece: Piece = {
-          id_item: normalizeValue(getColumnValue(['ID Item', 'IDItem', 'ID_Item', 'Material'])),
-          texto_breve: normalizeValue(getColumnValue(['Texto breve del material', 'Texto breve', 'TextoBreve', 'Texto'])),
-          tipo: tipo || normalizeValue(getColumnValue(['TIPO', 'Tipo', 'tipo'])),
-          fabricante: fabricante || normalizeValue(getColumnValue(['FABRICANTE', 'Fabricante', 'fabricante'])),
-          cabeza: normalizeValue(getColumnValue(['Cabeza', 'cabeza'])),
-          parte_division: normalizeValue(getColumnValue(['Parte (Division)', 'Parte', 'Division', 'Parte_Division', 'Parte(Division)'])),
-          cuerpo: normalizeValue(getColumnValue(['Cuerpo', 'cuerpo'])),
-          tramo: normalizeValue(getColumnValue(['Tramo', 'tramo'])),
-          posicion: normalizeValue(getColumnValue(['Posición', 'Posicion', 'posicion', 'Pos'])),
-          descripcion: normalizeValue(getColumnValue(['Descripción', 'Descripcion', 'descripcion'])),
-          long_2_principal: normalizeValue(getColumnValue(['Long 2 (Principal)', 'Long 2', 'Long2', 'Long_2', 'Long 2(Principal)'])),
-          cantidad_x_torre: parseNumber(getColumnValue(['Cantidad x Torre', 'Cantidad', 'Cant x Torre', 'Cant', 'Cantidad Torre'])),
-          peso_unitario: parseNumber(getColumnValue(['Peso Unitario', 'Peso', 'PesoUnitario', 'Peso Unit'])),
-          plano: normalizeValue(getColumnValue(['PLANO', 'Plano', 'plano'])),
-          mod_plano: normalizeValue(getColumnValue(['Mod Plano', 'ModPlano', 'Mod_Plano'])),
-          hoja_origen: sheetName
-        };
-        
-        const hasMinimumData = 
-          (piece.id_item && piece.id_item !== '-') || 
-          (piece.parte_division && piece.parte_division !== '-') ||
-          (piece.descripcion && piece.descripcion !== '-' && piece.descripcion.length > 3);
-        
-        if (hasMinimumData) {
-          allData.push(piece);
-        }
-      }
-    });
-    
-    console.log(`✅ Cargadas ${allData.length} piezas de ${workbook.SheetNames.length} hojas`);
-    
-    // Actualizar cache
-    cachedData = allData;
-    lastLoadTime = now;
-    
-    return allData;
-    
-  } catch (error) {
-    console.error('❌ Error al cargar Excel:', error);
-    throw new Error(`No se pudo cargar el archivo Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-  }
-}
 
 /**
  * Extrae TIPO y FABRICANTE del nombre de una hoja
  */
 function extractTipoFabricante(sheetName: string): [string, string] {
-  // Patrón 1: "FABRICANTE (TIPO - SUBTIPO)"
   let match = sheetName.match(/^([A-Z\s]+)\s*\(([A-Z]+)\s*-\s*([A-Z]+)\)$/i);
   if (match) {
     const fabricante = match[1].trim().toUpperCase();
@@ -593,7 +343,6 @@ function extractTipoFabricante(sheetName: string): [string, string] {
     return [tipo, `${fabricante} ${subtipo}`];
   }
   
-  // Patrón 2: "FABRICANTE (TIPO)"
   match = sheetName.match(/^([A-Z\s]+)\s*\(([A-Z0-9]+)\)$/i);
   if (match) {
     const fabricante = match[1].trim().toUpperCase();
@@ -601,7 +350,6 @@ function extractTipoFabricante(sheetName: string): [string, string] {
     return [tipo, fabricante];
   }
   
-  // Patrón 3: "TIPO_FABRICANTE"
   match = sheetName.match(/^([A-Z]+)[_\-](.+)$/i);
   if (match) {
     return [match[1].trim().toUpperCase(), match[2].trim().toUpperCase()];
@@ -637,37 +385,14 @@ function parseNumber(value: any): number {
 export function getOptions(filters: Record<string, string>): Record<string, string[]> {
   const data = loadExcelData();
   
-  console.log('\n🔍 getOptions - Filtros recibidos:', filters);
-  
-  const options: Record<string, string[]> = {
-    TIPO: [],
-    FABRICANTE: [],
-    CABEZA: [],
-    CUERPO: [],
-    PARTE_DIVISION: [],
-    TRAMO: []
-  };
-  
-  // Filtrar datos según filtros activos
   let filteredData = data;
   
-  if (filters.TIPO) {
-    filteredData = filteredData.filter(p => p.tipo === filters.TIPO);
-  }
-  if (filters.FABRICANTE) {
-    filteredData = filteredData.filter(p => p.fabricante === filters.FABRICANTE);
-  }
-  if (filters.CABEZA) {
-    filteredData = filteredData.filter(p => p.cabeza === filters.CABEZA);
-  }
-  if (filters.CUERPO) {
-    filteredData = filteredData.filter(p => p.cuerpo === filters.CUERPO);
-  }
-  if (filters.TRAMO) {
-    filteredData = filteredData.filter(p => p.tramo === filters.TRAMO);
-  }
+  if (filters.TIPO) filteredData = filteredData.filter(p => p.tipo === filters.TIPO);
+  if (filters.FABRICANTE) filteredData = filteredData.filter(p => p.fabricante === filters.FABRICANTE);
+  if (filters.CABEZA) filteredData = filteredData.filter(p => p.cabeza === filters.CABEZA);
+  if (filters.CUERPO) filteredData = filteredData.filter(p => p.cuerpo === filters.CUERPO);
+  if (filters.TRAMO) filteredData = filteredData.filter(p => p.tramo === filters.TRAMO);
   
-  // Extraer valores únicos
   const uniqueValues = {
     TIPO: new Set<string>(),
     FABRICANTE: new Set<string>(),
@@ -686,51 +411,32 @@ export function getOptions(filters: Record<string, string>): Record<string, stri
     if (piece.tramo && piece.tramo !== '-') uniqueValues.TRAMO.add(piece.tramo);
   });
   
-  // Convertir Sets a arrays ordenados
-  options.TIPO = Array.from(uniqueValues.TIPO).sort();
-  options.FABRICANTE = Array.from(uniqueValues.FABRICANTE).sort();
-  options.CABEZA = Array.from(uniqueValues.CABEZA).sort();
-  options.CUERPO = Array.from(uniqueValues.CUERPO).sort();
-  options.PARTE_DIVISION = Array.from(uniqueValues.PARTE_DIVISION).sort();
-  options.TRAMO = Array.from(uniqueValues.TRAMO).sort();
-  
-  console.log('📊 Opciones encontradas:', Object.entries(options).map(([k, v]) => `${k}: ${v.length}`).join(', '));
-  
-  return options;
+  return {
+    TIPO: Array.from(uniqueValues.TIPO).sort(),
+    FABRICANTE: Array.from(uniqueValues.FABRICANTE).sort(),
+    CABEZA: Array.from(uniqueValues.CABEZA).sort(),
+    CUERPO: Array.from(uniqueValues.CUERPO).sort(),
+    PARTE_DIVISION: Array.from(uniqueValues.PARTE_DIVISION).sort(),
+    TRAMO: Array.from(uniqueValues.TRAMO).sort()
+  };
 }
 
 /**
  * Busca piezas según filtros
  */
 export function searchPieces(filters: Record<string, string>): Piece[] {
-  console.log('\n🔎 searchPieces - Filtros recibidos:', filters);
-  
   let data = loadExcelData();
   
-  // Aplicar filtros
-  if (filters.tipo) {
-    data = data.filter(p => p.tipo === filters.tipo);
-  }
-  if (filters.fabricante) {
-    data = data.filter(p => p.fabricante === filters.fabricante);
-  }
-  if (filters.cabeza) {
-    data = data.filter(p => p.cabeza === filters.cabeza);
-  }
-  if (filters.parte) {
-    data = data.filter(p => p.parte_division === filters.parte);
-  }
-  if (filters.cuerpo) {
-    data = data.filter(p => p.cuerpo === filters.cuerpo);
-  }
+  if (filters.tipo) data = data.filter(p => p.tipo === filters.tipo);
+  if (filters.fabricante) data = data.filter(p => p.fabricante === filters.fabricante);
+  if (filters.cabeza) data = data.filter(p => p.cabeza === filters.cabeza);
+  if (filters.parte) data = data.filter(p => p.parte_division === filters.parte);
+  if (filters.cuerpo) data = data.filter(p => p.cuerpo === filters.cuerpo);
   if (filters.tramo) {
     const tramoLower = filters.tramo.toLowerCase();
     data = data.filter(p => p.tramo.toLowerCase() === tramoLower);
   }
   
-  console.log(`✅ Encontradas ${data.length} piezas`);
-  
-  // Limitar resultados
   return data.slice(0, 500);
 }
 
@@ -742,28 +448,14 @@ export function calculateMaterials(
   parts: Array<{ part: string; quantity: number }>
 ): { results: CalculatedPiece[]; totals: { total_pieces: number; total_weight: number } } {
   
-  console.log('\n🧮 calculateMaterials');
-  console.log('  Filtros:', filters);
-  console.log('  Partes:', parts);
-  
   let data = loadExcelData();
   
-  // Aplicar filtros base
-  if (filters.tipo) {
-    data = data.filter(p => p.tipo === filters.tipo);
-  }
-  if (filters.fabricante) {
-    data = data.filter(p => p.fabricante === filters.fabricante);
-  }
-  if (filters.cabeza) {
-    data = data.filter(p => p.cabeza === filters.cabeza);
-  }
-  
-  console.log(`  Total piezas base: ${data.length}`);
+  if (filters.tipo) data = data.filter(p => p.tipo === filters.tipo);
+  if (filters.fabricante) data = data.filter(p => p.fabricante === filters.fabricante);
+  if (filters.cabeza) data = data.filter(p => p.cabeza === filters.cabeza);
   
   const calculatedPieces: CalculatedPiece[] = [];
   
-  // Procesar cada pieza
   data.forEach(piece => {
     const parteDiv = (piece.parte_division || '').trim().toUpperCase();
     if (!parteDiv || parteDiv === '-') return;
@@ -771,7 +463,6 @@ export function calculateMaterials(
     const cantidadOriginal = piece.cantidad_x_torre || 0;
     let cantidadCalculada = 0;
     
-    // Calcular cantidad según las partes seleccionadas
     for (const selectedPart of parts) {
       const partName = (selectedPart.part || '').trim().toUpperCase();
       const partQty = selectedPart.quantity || 0;
@@ -791,7 +482,6 @@ export function calculateMaterials(
       }
     }
     
-    // Solo agregar si hay cantidad calculada
     if (cantidadCalculada > 0) {
       const pesoUnitario = piece.peso_unitario || 0;
       const pesoTotal = cantidadCalculada * pesoUnitario;
@@ -813,12 +503,8 @@ export function calculateMaterials(
     }
   });
   
-  // Calcular totales
   const totalPiezas = calculatedPieces.reduce((sum, p) => sum + p.cantidad_calculada, 0);
   const totalPeso = calculatedPieces.reduce((sum, p) => sum + p.peso_total, 0);
-  
-  console.log(`  ✅ Resultado: ${calculatedPieces.length} piezas calculadas`);
-  console.log(`  📊 Totales: ${totalPiezas} piezas, ${totalPeso.toFixed(2)} kg`);
   
   return {
     results: calculatedPieces,
@@ -829,75 +515,35 @@ export function calculateMaterials(
   };
 }
 
+// ========== FUNCIONES ASYNC ==========
+
 export async function searchPiecesAsync(filters: Record<string, string>): Promise<Piece[]> {
-  console.log('\n🔎 searchPiecesAsync - Filtros recibidos:', filters);
-  
   let data = await loadExcelDataAsync();
   
-  // Aplicar filtros
-  if (filters.tipo) {
-    data = data.filter(p => p.tipo === filters.tipo);
-  }
-  if (filters.fabricante) {
-    data = data.filter(p => p.fabricante === filters.fabricante);
-  }
-  if (filters.cabeza) {
-    data = data.filter(p => p.cabeza === filters.cabeza);
-  }
-  if (filters.parte) {
-    data = data.filter(p => p.parte_division === filters.parte);
-  }
-  if (filters.cuerpo) {
-    data = data.filter(p => p.cuerpo === filters.cuerpo);
-  }
+  if (filters.tipo) data = data.filter(p => p.tipo === filters.tipo);
+  if (filters.fabricante) data = data.filter(p => p.fabricante === filters.fabricante);
+  if (filters.cabeza) data = data.filter(p => p.cabeza === filters.cabeza);
+  if (filters.parte) data = data.filter(p => p.parte_division === filters.parte);
+  if (filters.cuerpo) data = data.filter(p => p.cuerpo === filters.cuerpo);
   if (filters.tramo) {
     const tramoLower = filters.tramo.toLowerCase();
     data = data.filter(p => p.tramo.toLowerCase() === tramoLower);
   }
   
-  console.log(`✅ Encontradas ${data.length} piezas`);
-  
-  // Limitar resultados
   return data.slice(0, 500);
 }
 
-/**
- * Obtiene opciones únicas para cada campo según filtros aplicados (versión async)
- */
 export async function getOptionsAsync(filters: Record<string, string>): Promise<Record<string, string[]>> {
   const data = await loadExcelDataAsync();
   
-  console.log('\n🔍 getOptionsAsync - Filtros recibidos:', filters);
-  
-  const options: Record<string, string[]> = {
-    TIPO: [],
-    FABRICANTE: [],
-    CABEZA: [],
-    CUERPO: [],
-    PARTE_DIVISION: [],
-    TRAMO: []
-  };
-  
-  // Filtrar datos según filtros activos
   let filteredData = data;
   
-  if (filters.TIPO) {
-    filteredData = filteredData.filter(p => p.tipo === filters.TIPO);
-  }
-  if (filters.FABRICANTE) {
-    filteredData = filteredData.filter(p => p.fabricante === filters.FABRICANTE);
-  }
-  if (filters.CABEZA) {
-    filteredData = filteredData.filter(p => p.cabeza === filters.CABEZA);
-  }
-  if (filters.CUERPO) {
-    filteredData = filteredData.filter(p => p.cuerpo === filters.CUERPO);
-  }
-  if (filters.TRAMO) {
-    filteredData = filteredData.filter(p => p.tramo === filters.TRAMO);
-  }
+  if (filters.TIPO) filteredData = filteredData.filter(p => p.tipo === filters.TIPO);
+  if (filters.FABRICANTE) filteredData = filteredData.filter(p => p.fabricante === filters.FABRICANTE);
+  if (filters.CABEZA) filteredData = filteredData.filter(p => p.cabeza === filters.CABEZA);
+  if (filters.CUERPO) filteredData = filteredData.filter(p => p.cuerpo === filters.CUERPO);
+  if (filters.TRAMO) filteredData = filteredData.filter(p => p.tramo === filters.TRAMO);
   
-  // Extraer valores únicos
   const uniqueValues = {
     TIPO: new Set<string>(),
     FABRICANTE: new Set<string>(),
@@ -916,49 +562,29 @@ export async function getOptionsAsync(filters: Record<string, string>): Promise<
     if (piece.tramo && piece.tramo !== '-') uniqueValues.TRAMO.add(piece.tramo);
   });
   
-  // Convertir Sets a arrays ordenados
-  options.TIPO = Array.from(uniqueValues.TIPO).sort();
-  options.FABRICANTE = Array.from(uniqueValues.FABRICANTE).sort();
-  options.CABEZA = Array.from(uniqueValues.CABEZA).sort();
-  options.CUERPO = Array.from(uniqueValues.CUERPO).sort();
-  options.PARTE_DIVISION = Array.from(uniqueValues.PARTE_DIVISION).sort();
-  options.TRAMO = Array.from(uniqueValues.TRAMO).sort();
-  
-  console.log('📊 Opciones encontradas:', Object.entries(options).map(([k, v]) => `${k}: ${v.length}`).join(', '));
-  
-  return options;
+  return {
+    TIPO: Array.from(uniqueValues.TIPO).sort(),
+    FABRICANTE: Array.from(uniqueValues.FABRICANTE).sort(),
+    CABEZA: Array.from(uniqueValues.CABEZA).sort(),
+    CUERPO: Array.from(uniqueValues.CUERPO).sort(),
+    PARTE_DIVISION: Array.from(uniqueValues.PARTE_DIVISION).sort(),
+    TRAMO: Array.from(uniqueValues.TRAMO).sort()
+  };
 }
 
-/**
- * Calcula materiales según partes seleccionadas (versión async)
- */
 export async function calculateMaterialsAsync(
   filters: Record<string, string>,
   parts: Array<{ part: string; quantity: number }>
 ): Promise<{ results: CalculatedPiece[]; totals: { total_pieces: number; total_weight: number } }> {
   
-  console.log('\n🧮 calculateMaterialsAsync');
-  console.log('  Filtros:', filters);
-  console.log('  Partes:', parts);
-  
   let data = await loadExcelDataAsync();
   
-  // Aplicar filtros base
-  if (filters.tipo) {
-    data = data.filter(p => p.tipo === filters.tipo);
-  }
-  if (filters.fabricante) {
-    data = data.filter(p => p.fabricante === filters.fabricante);
-  }
-  if (filters.cabeza) {
-    data = data.filter(p => p.cabeza === filters.cabeza);
-  }
-  
-  console.log(`  Total piezas base: ${data.length}`);
+  if (filters.tipo) data = data.filter(p => p.tipo === filters.tipo);
+  if (filters.fabricante) data = data.filter(p => p.fabricante === filters.fabricante);
+  if (filters.cabeza) data = data.filter(p => p.cabeza === filters.cabeza);
   
   const calculatedPieces: CalculatedPiece[] = [];
   
-  // Procesar cada pieza
   data.forEach(piece => {
     const parteDiv = (piece.parte_division || '').trim().toUpperCase();
     if (!parteDiv || parteDiv === '-') return;
@@ -966,7 +592,6 @@ export async function calculateMaterialsAsync(
     const cantidadOriginal = piece.cantidad_x_torre || 0;
     let cantidadCalculada = 0;
     
-    // Calcular cantidad según las partes seleccionadas
     for (const selectedPart of parts) {
       const partName = (selectedPart.part || '').trim().toUpperCase();
       const partQty = selectedPart.quantity || 0;
@@ -986,7 +611,6 @@ export async function calculateMaterialsAsync(
       }
     }
     
-    // Solo agregar si hay cantidad calculada
     if (cantidadCalculada > 0) {
       const pesoUnitario = piece.peso_unitario || 0;
       const pesoTotal = cantidadCalculada * pesoUnitario;
@@ -1008,12 +632,8 @@ export async function calculateMaterialsAsync(
     }
   });
   
-  // Calcular totales
   const totalPiezas = calculatedPieces.reduce((sum, p) => sum + p.cantidad_calculada, 0);
   const totalPeso = calculatedPieces.reduce((sum, p) => sum + p.peso_total, 0);
-  
-  console.log(`  ✅ Resultado: ${calculatedPieces.length} piezas calculadas`);
-  console.log(`  📊 Totales: ${totalPiezas} piezas, ${totalPeso.toFixed(2)} kg`);
   
   return {
     results: calculatedPieces,
