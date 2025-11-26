@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadExcelData } from '@/lib/excel-database';
+import { loadExcelDataAsync } from '@/lib/excel-database';
 
 export async function GET() {
   console.log('\n🌐 API /api/debug - REQUEST');
   
   try {
-    const data = loadExcelData(true); // Force reload
+    // Usar versión async con force reload
+    const data = await loadExcelDataAsync(true);
     
     // Obtener una muestra
     const sample = data[0];

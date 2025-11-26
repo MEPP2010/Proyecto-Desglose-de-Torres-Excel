@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { calculateMaterials } from '@/lib/excel-database';
+import { calculateMaterialsAsync } from '@/lib/excel-database';
 
 export async function POST(request: NextRequest) {
   console.log('\n🌐 API /api/calculate - REQUEST (POST)');
@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const result = calculateMaterials(filters, parts);
+    // Usar versión async
+    const result = await calculateMaterialsAsync(filters, parts);
     
     console.log(`✅ API /api/calculate - RESPONSE: ${result.results.length} piezas calculadas\n`);
     

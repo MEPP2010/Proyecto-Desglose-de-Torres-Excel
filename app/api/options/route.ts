@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOptions } from '@/lib/excel-database';
+import { getOptionsAsync } from '@/lib/excel-database';
 
 export async function GET(request: Request) {
   console.log('\n🌐 API /api/options - REQUEST');
@@ -17,7 +17,8 @@ export async function GET(request: Request) {
     
     console.log('📥 Parámetros recibidos:', filters);
     
-    const options = getOptions(filters);
+    // Usar versión async
+    const options = await getOptionsAsync(filters);
     
     console.log('✅ API /api/options - RESPONSE SUCCESS\n');
     

@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from 'next/server';
-import { searchPieces } from '@/lib/excel-database';
+import { searchPiecesAsync } from '@/lib/excel-database';
 
 export async function GET(request: Request) {
   console.log('\n🌐 API /api/search - REQUEST');
@@ -20,7 +20,8 @@ export async function GET(request: Request) {
     
     console.log('📥 Filtros de búsqueda:', filters);
     
-    const pieces = searchPieces(filters);
+    // Usar versión async
+    const pieces = await searchPiecesAsync(filters);
     
     console.log(`✅ API /api/search - RESPONSE: ${pieces.length} piezas\n`);
     
