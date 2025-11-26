@@ -82,8 +82,24 @@ export function invalidateCache(): void {
   lastLoadTime = 0;
 }
 
+export function getCacheInfo() {
+  const now = Date.now();
+  const timeInCache = cachedData ? now - lastLoadTime : 0;
+  const isExpired = timeInCache > CACHE_TTL;
+  
+  return {
+    hasCachedData: cachedData !== null,
+    recordsCount: cachedData?.length || 0,
+    cacheAge: Math.floor(timeInCache / 1000),
+    cacheAgeMinutes: Math.floor(timeInCache / 60000),
+    isExpired,
+    timeToExpire: isExpired ? 0 : Math.floor((CACHE_TTL - timeInCache) / 1000)
+  };
+}
+
 /**
  * Carga el archivo Excel desde Vercel Blob Storage o local
+ * NOTA: Esta es la versión sincrónica (legacy). Se recomienda usar loadExcelDataAsync()
  */
 export function loadExcelData(forceReload = false): Piece[] {
   const now = Date.now();
@@ -94,24 +110,15 @@ export function loadExcelData(forceReload = false): Piece[] {
     return cachedData;
   }
 
-  console.log('📂 Cargando datos desde Excel...');
+  console.log('📂 Cargando datos desde Excel (modo síncrono - solo para desarrollo local)...');
   
   try {
     let fileBuffer: Buffer;
     
-    // Verificar si estamos en producción (Vercel) o desarrollo local
-    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
-    
-    if (isProduction && process.env.EXCEL_BLOB_URL) {
-      // PRODUCCIÓN: Cargar desde Vercel Blob Storage
-      console.log('☁️ Cargando desde Vercel Blob Storage...');
-      fileBuffer = loadFromBlobStorage(process.env.EXCEL_BLOB_URL);
-    } else {
-      // DESARROLLO: Cargar desde sistema de archivos local
-      console.log('💻 Cargando desde archivo local...');
-      const excelPath = join(process.cwd(), 'data', 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
-      fileBuffer = readFileSync(excelPath);
-    }
+    // Solo funciona en desarrollo local (no en Vercel)
+    console.log('💻 Cargando desde archivo local...');
+    const excelPath = join(process.cwd(), 'data', 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
+    fileBuffer = readFileSync(excelPath);
     
     // Leer el workbook desde el buffer
     const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
@@ -270,40 +277,170 @@ export function loadExcelData(forceReload = false): Piece[] {
 }
 
 /**
- * Carga el archivo desde Vercel Blob Storage (versión síncrona simulada)
- * En producción, esto se ejecuta en el servidor
- */
-function loadFromBlobStorage(blobUrl: string): Buffer {
-  try {
-    // En un entorno Node.js, usamos fetch para descargar el archivo
-    // Nota: Esta función debe ser async en realidad, pero para mantener
-    // compatibilidad con el código existente, usamos una versión simplificada
-    
-    console.log(`   🔗 Descargando desde: ${blobUrl}`);
-    
-    // Para Node.js 18+, fetch está disponible globalmente
-    const response = fetch(blobUrl);
-    
-    // Esperamos la respuesta de manera síncrona usando técnicas avanzadas
-    // En producción real, esto debería ser async
-    return Buffer.from([]);  // Placeholder - ver nota abajo
-    
-  } catch (error) {
-    console.error('❌ Error al descargar desde Blob Storage:', error);
-    throw error;
-  }
-}
-
-/**
- * NOTA IMPORTANTE: La función loadFromBlobStorage anterior es un placeholder.
- * Dado que fetch es async, necesitamos convertir loadExcelData a async también.
- * Aquí está la versión ASYNC completa que debes usar:
- */
-
-/**
  * Versión ASYNC de loadExcelData (RECOMENDADA)
+ * Incluye cache busting para reflejar cambios inmediatamente
  */
 export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> {
+  const now = Date.now();
+  
+  // Retornar cache si es válido
+  if (!forceReload && cachedData && (now - lastLoadTime) < CACHE_TTL) {
+    console.log('📦 Usando datos en caché');
+    return cachedData;
+  }
+
+  console.log('📂 Cargando datos desde Excel...');
+  
+  try {
+    let fileBuffer: Buffer;
+    
+    // Verificar si estamos en producción (Vercel) o desarrollo local
+    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+    
+    if (isProduction && process.env.EXCEL_BLOB_URL) {
+      // PRODUCCIÓN: Cargar desde Vercel Blob Storage
+      console.log('☁️ Cargando desde Vercel Blob Storage...');
+      
+      // ⭐ CACHE BUSTING: Agregar timestamp aleatorio para evitar cache ⭐
+      const cacheBuster = `?cb=${Date.now()}&r=${Math.random().toString(36).substring(7)}`;
+      const url = process.env.EXCEL_BLOB_URL + cacheBuster;
+      
+      console.log(`   🔗 URL: ${url.substring(0, 100)}...`);
+      
+      const response = await fetch(url, {
+        // ⭐ FORZAR NO USAR CACHE DEL NAVEGADOR/CDN ⭐
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error al descargar archivo: ${response.status} ${response.statusText}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      fileBuffer = Buffer.from(arrayBuffer);
+      console.log(`   ✅ Descargado exitosamente: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
+      
+    } else {
+      // DESARROLLO: Cargar desde sistema de archivos local
+      console.log('💻 Cargando desde archivo local...');
+      const excelPath = join(process.cwd(), 'data', 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
+      fileBuffer = readFileSync(excelPath);
+    }
+    
+    // Leer el workbook desde el buffer
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    
+    const allData: Piece[] = [];
+    
+    // Procesar cada hoja (mismo código que antes)
+    workbook.SheetNames.forEach(sheetName => {
+      console.log(`  📄 Procesando hoja: ${sheetName}`);
+      
+      const worksheet = workbook.Sheets[sheetName];
+      const rawData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1,
+        raw: false,
+        defval: ''
+      }) as any[][];
+      
+      if (rawData.length === 0) return;
+      
+      // Encontrar encabezados
+      let headerRowIndex = -1;
+      let headers: string[] = [];
+      
+      for (let i = 0; i < Math.min(10, rawData.length); i++) {
+        const row = rawData[i];
+        const rowStr = row.join('|').toUpperCase();
+        
+        if (rowStr.includes('ID ITEM') || 
+            rowStr.includes('FABRICANTE') || 
+            rowStr.includes('PARTE') ||
+            (rowStr.includes('TIPO') && rowStr.includes('CABEZA'))) {
+          headerRowIndex = i;
+          headers = row.map(cell => String(cell || '').trim());
+          break;
+        }
+      }
+      
+      if (headerRowIndex === -1) return;
+      
+      const [tipo, fabricante] = extractTipoFabricante(sheetName);
+      
+      // Procesar filas
+      for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+        const rowArray = rawData[i];
+        const row: any = {};
+        headers.forEach((header, index) => {
+          if (header) row[header] = rowArray[index] || '';
+        });
+        
+        const getColumnValue = (possibleNames: string[]) => {
+          for (const name of possibleNames) {
+            if (row[name] !== undefined) return row[name];
+            const foundKey = Object.keys(row).find(k => 
+              k.toLowerCase() === name.toLowerCase()
+            );
+            if (foundKey) return row[foundKey];
+          }
+          return '';
+        };
+        
+        const piece: Piece = {
+          id_item: normalizeValue(getColumnValue(['ID Item', 'IDItem', 'ID_Item', 'Material'])),
+          texto_breve: normalizeValue(getColumnValue(['Texto breve del material', 'Texto breve', 'TextoBreve', 'Texto'])),
+          tipo: tipo || normalizeValue(getColumnValue(['TIPO', 'Tipo', 'tipo'])),
+          fabricante: fabricante || normalizeValue(getColumnValue(['FABRICANTE', 'Fabricante', 'fabricante'])),
+          cabeza: normalizeValue(getColumnValue(['Cabeza', 'cabeza'])),
+          parte_division: normalizeValue(getColumnValue(['Parte (Division)', 'Parte', 'Division', 'Parte_Division', 'Parte(Division)'])),
+          cuerpo: normalizeValue(getColumnValue(['Cuerpo', 'cuerpo'])),
+          tramo: normalizeValue(getColumnValue(['Tramo', 'tramo'])),
+          posicion: normalizeValue(getColumnValue(['Posición', 'Posicion', 'posicion', 'Pos'])),
+          descripcion: normalizeValue(getColumnValue(['Descripción', 'Descripcion', 'descripcion'])),
+          long_2_principal: normalizeValue(getColumnValue(['Long 2 (Principal)', 'Long 2', 'Long2', 'Long_2', 'Long 2(Principal)'])),
+          cantidad_x_torre: parseNumber(getColumnValue(['Cantidad x Torre', 'Cantidad', 'Cant x Torre', 'Cant', 'Cantidad Torre'])),
+          peso_unitario: parseNumber(getColumnValue(['Peso Unitario', 'Peso', 'PesoUnitario', 'Peso Unit'])),
+          plano: normalizeValue(getColumnValue(['PLANO', 'Plano', 'plano'])),
+          mod_plano: normalizeValue(getColumnValue(['Mod Plano', 'ModPlano', 'Mod_Plano'])),
+          hoja_origen: sheetName
+        };
+        
+        const hasMinimumData = 
+          (piece.id_item && piece.id_item !== '-') || 
+          (piece.parte_division && piece.parte_division !== '-') ||
+          (piece.descripcion && piece.descripcion !== '-' && piece.descripcion.length > 3);
+        
+        if (hasMinimumData) {
+          allData.push(piece);
+        }
+      }
+    });
+    
+    console.log(`✅ Cargadas ${allData.length} piezas de ${workbook.SheetNames.length} hojas`);
+    
+    // Actualizar cache
+    cachedData = allData;
+    lastLoadTime = now;
+    
+    return allData;
+    
+  } catch (error) {
+    console.error('❌ Error al cargar Excel:', error);
+    
+    // Si hay cache viejo, usarlo como fallback
+    if (cachedData && cachedData.length > 0) {
+      console.warn('⚠️ Usando cache antiguo como fallback');
+      return cachedData;
+    }
+    
+    throw new Error(`No se pudo cargar el archivo Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+  }
+}
   const now = Date.now();
   
   // Retornar cache si es válido
