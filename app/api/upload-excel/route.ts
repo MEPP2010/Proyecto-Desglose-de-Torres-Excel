@@ -1,8 +1,8 @@
-// app/api/upload-excel/route.ts - VERSIÓN MEJORADA
+// app/api/upload-excel/route.ts - ⭐ VERSIÓN CON RECARGA INMEDIATA FORZADA ⭐
 import { NextRequest, NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import * as XLSX from 'xlsx';
-import { invalidateCache } from '@/lib/excel-database';
+import { invalidateCache, loadExcelDataAsync } from '@/lib/excel-database';
 
 export async function POST(request: NextRequest) {
   console.log('\n🌐 API /api/upload-excel - REQUEST (POST)');
@@ -58,19 +58,44 @@ export async function POST(request: NextRequest) {
       
       console.log(`✅ Archivo subido a Blob Storage: ${blob.url}`);
 
-      // ⭐ INVALIDAR EL CACHE INMEDIATAMENTE ⭐
+      // ⭐⭐⭐ PASO 1: INVALIDAR EL CACHE INMEDIATAMENTE ⭐⭐⭐
       invalidateCache();
-      console.log('🔄 Cache invalidado - próxima petición cargará datos nuevos');
+      console.log('🔄 Cache invalidado');
+
+      // ⭐⭐⭐ PASO 2: PRE-CARGAR LOS DATOS NUEVOS FORZADAMENTE ⭐⭐⭐
+      console.log('📥 Pre-cargando datos nuevos...');
+      const newData = await loadExcelDataAsync(true); // forceReload = true
+      console.log(`✅ Datos pre-cargados: ${newData.length} registros`);
+
+      // ⭐⭐⭐ PASO 3: REVALIDAR TODAS LAS RUTAS RELEVANTES ⭐⭐⭐
+      // Esto fuerza a Next.js a regenerar las páginas estáticas
+      if (process.env.VERCEL === '1') {
+        console.log('🔄 Revalidando rutas en Vercel...');
+        try {
+          // Revalidar las páginas principales
+          await fetch(`${process.env.VERCEL_URL || 'http://localhost:3000'}/api/revalidate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              paths: ['/', '/calculadora', '/api/options', '/api/search', '/api/calculate']
+            })
+          }).catch(err => console.warn('⚠️ No se pudo revalidar:', err.message));
+        } catch (e) {
+          console.warn('⚠️ Revalidación no disponible');
+        }
+      }
 
       return NextResponse.json({
         success: true,
-        message: 'Archivo actualizado exitosamente. Los cambios se verán reflejados de inmediato.',
+        message: '✅ Archivo actualizado y datos recargados exitosamente. Los cambios están disponibles de inmediato.',
         stats: {
           blobUrl: blob.url,
           fileName: file.name,
           fileSize: `${(file.size / 1024).toFixed(2)} KB`,
           uploadedAt: new Date().toISOString(),
-          cacheInvalidated: true
+          cacheInvalidated: true,
+          dataPreloaded: true,
+          recordsCount: newData.length
         }
       });
     } catch (blobError) {

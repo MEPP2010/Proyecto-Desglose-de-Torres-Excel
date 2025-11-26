@@ -47,18 +47,24 @@ export const PARTS_DIV_4 = new Set([
   'PATA 4.5', 'PATA 6', 'PATA 6.0', 'PATA 7.5', 'PATA 9', 'PATA 9.0'
 ]);
 
-// Cache de datos en memoria
+// ========================================
+// 🔥 SISTEMA DE CACHE MEJORADO
+// ========================================
+
 let cachedData: Piece[] | null = null;
 let lastLoadTime: number = 0;
+let cacheVersion: number = 0; // Nueva versión de cache
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
 /**
- * Invalida el cache forzando una recarga en la próxima petición
+ * ⭐ INVALIDA EL CACHE Y FUERZA RECARGA ⭐
  */
 export function invalidateCache(): void {
-  console.log('🗑️ Cache invalidado');
+  console.log('🗑️ Cache invalidado - se forzará recarga completa');
   cachedData = null;
   lastLoadTime = 0;
+  cacheVersion++; // Incrementar versión para tracking
+  console.log(`   📌 Nueva versión de cache: ${cacheVersion}`);
 }
 
 /**
@@ -75,12 +81,185 @@ export function getCacheInfo() {
     cacheAge: Math.floor(timeInCache / 1000),
     cacheAgeMinutes: Math.floor(timeInCache / 60000),
     isExpired,
-    timeToExpire: isExpired ? 0 : Math.floor((CACHE_TTL - timeInCache) / 1000)
+    timeToExpire: isExpired ? 0 : Math.floor((CACHE_TTL - timeInCache) / 1000),
+    cacheVersion
   };
 }
 
 /**
+ * ⭐⭐⭐ VERSIÓN ASYNC CON CACHE BUSTING ULTRA AGRESIVO ⭐⭐⭐
+ * Esta es la versión que se debe usar en PRODUCCIÓN con Vercel Blob Storage
+ */
+export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> {
+  const now = Date.now();
+  
+  // ✅ Solo usar cache si no ha expirado Y no se forzó recarga
+  if (!forceReload && cachedData && (now - lastLoadTime) < CACHE_TTL) {
+    console.log(`📦 Usando datos en caché (v${cacheVersion}, edad: ${Math.floor((now - lastLoadTime) / 1000)}s)`);
+    return cachedData;
+  }
+
+  console.log(`📂 ${forceReload ? 'FORZANDO' : 'Iniciando'} carga de datos desde Excel...`);
+  
+  try {
+    let fileBuffer: Buffer;
+    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
+    
+    if (isProduction && process.env.EXCEL_BLOB_URL) {
+      console.log('☁️ Cargando desde Vercel Blob Storage...');
+      
+      // ⭐⭐⭐ CACHE BUSTING ULTRA AGRESIVO ⭐⭐⭐
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substring(2, 15);
+      const nonce = Math.random().toString(36).substring(2, 8);
+      const cacheBuster = `?t=${timestamp}&r=${random}&v=${cacheVersion}&n=${nonce}&force=${forceReload ? '1' : '0'}`;
+      const url = process.env.EXCEL_BLOB_URL + cacheBuster;
+      
+      console.log(`   📡 Descargando con cache-buster agresivo...`);
+      console.log(`   🔗 URL: ${url.substring(0, 150)}...`);
+      
+      const response = await fetch(url, {
+        // ⭐ Next.js cache options
+        cache: 'no-store',
+        next: { 
+          revalidate: 0,  // ISR: revalidar inmediatamente
+          tags: [`excel-data-v${cacheVersion}`] // Tag para invalidación
+        },
+        // ⭐ HTTP cache headers ultra agresivos
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0, s-maxage=0, stale-while-revalidate=0, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'If-Modified-Since': '0',
+          'If-None-Match': '',
+          'X-Vercel-No-Cache': '1', // Header específico de Vercel
+          'X-Force-Reload': forceReload ? '1' : '0'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      fileBuffer = Buffer.from(arrayBuffer);
+      const sizeMB = (fileBuffer.length / 1024 / 1024).toFixed(2);
+      console.log(`   ✅ Archivo descargado: ${sizeMB} MB`);
+      
+    } else {
+      console.log('💻 Cargando desde archivo local (desarrollo)...');
+      const excelPath = join(process.cwd(), 'data', 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
+      fileBuffer = readFileSync(excelPath);
+    }
+    
+    // Procesar el Excel
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    const allData: Piece[] = [];
+    
+    console.log(`   📊 Procesando ${workbook.SheetNames.length} hojas...`);
+    
+    workbook.SheetNames.forEach(sheetName => {
+      const worksheet = workbook.Sheets[sheetName];
+      const rawData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1,
+        raw: false,
+        defval: ''
+      }) as any[][];
+      
+      if (rawData.length === 0) return;
+      
+      let headerRowIndex = -1;
+      let headers: string[] = [];
+      
+      for (let i = 0; i < Math.min(10, rawData.length); i++) {
+        const row = rawData[i];
+        const rowStr = row.join('|').toUpperCase();
+        
+        if (rowStr.includes('ID ITEM') || rowStr.includes('FABRICANTE') || 
+            rowStr.includes('PARTE') || (rowStr.includes('TIPO') && rowStr.includes('CABEZA'))) {
+          headerRowIndex = i;
+          headers = row.map(cell => String(cell || '').trim());
+          break;
+        }
+      }
+      
+      if (headerRowIndex === -1) return;
+      
+      const [tipo, fabricante] = extractTipoFabricante(sheetName);
+      
+      for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+        const rowArray = rawData[i];
+        const row: any = {};
+        headers.forEach((header, index) => {
+          if (header) row[header] = rowArray[index] || '';
+        });
+        
+        const getColumnValue = (possibleNames: string[]) => {
+          for (const name of possibleNames) {
+            if (row[name] !== undefined) return row[name];
+            const foundKey = Object.keys(row).find(k => 
+              k.toLowerCase() === name.toLowerCase()
+            );
+            if (foundKey) return row[foundKey];
+          }
+          return '';
+        };
+        
+        const piece: Piece = {
+          id_item: normalizeValue(getColumnValue(['ID Item', 'IDItem', 'ID_Item', 'Material'])),
+          texto_breve: normalizeValue(getColumnValue(['Texto breve del material', 'Texto breve', 'TextoBreve', 'Texto'])),
+          tipo: tipo || normalizeValue(getColumnValue(['TIPO', 'Tipo', 'tipo'])),
+          fabricante: fabricante || normalizeValue(getColumnValue(['FABRICANTE', 'Fabricante', 'fabricante'])),
+          cabeza: normalizeValue(getColumnValue(['Cabeza', 'cabeza'])),
+          parte_division: normalizeValue(getColumnValue(['Parte (Division)', 'Parte', 'Division', 'Parte_Division', 'Parte(Division)'])),
+          cuerpo: normalizeValue(getColumnValue(['Cuerpo', 'cuerpo'])),
+          tramo: normalizeValue(getColumnValue(['Tramo', 'tramo'])),
+          posicion: normalizeValue(getColumnValue(['Posición', 'Posicion', 'posicion', 'Pos'])),
+          descripcion: normalizeValue(getColumnValue(['Descripción', 'Descripcion', 'descripcion'])),
+          long_2_principal: normalizeValue(getColumnValue(['Long 2 (Principal)', 'Long 2', 'Long2', 'Long_2', 'Long 2(Principal)'])),
+          cantidad_x_torre: parseNumber(getColumnValue(['Cantidad x Torre', 'Cantidad', 'Cant x Torre', 'Cant', 'Cantidad Torre'])),
+          peso_unitario: parseNumber(getColumnValue(['Peso Unitario', 'Peso', 'PesoUnitario', 'Peso Unit'])),
+          plano: normalizeValue(getColumnValue(['PLANO', 'Plano', 'plano'])),
+          mod_plano: normalizeValue(getColumnValue(['Mod Plano', 'ModPlano', 'Mod_Plano'])),
+          hoja_origen: sheetName
+        };
+        
+        const hasMinimumData = 
+          (piece.id_item && piece.id_item !== '-') || 
+          (piece.parte_division && piece.parte_division !== '-') ||
+          (piece.descripcion && piece.descripcion !== '-' && piece.descripcion.length > 3);
+        
+        if (hasMinimumData) {
+          allData.push(piece);
+        }
+      }
+    });
+    
+    // ⭐ Actualizar cache con nueva data
+    cachedData = allData;
+    lastLoadTime = now;
+    
+    console.log(`   ✅ Carga completada: ${allData.length} registros`);
+    console.log(`   📌 Cache actualizado (v${cacheVersion})\n`);
+    
+    return allData;
+    
+  } catch (error) {
+    console.error('❌ Error al cargar Excel:', error);
+    
+    // Fallback: usar cache antiguo si existe
+    if (cachedData && cachedData.length > 0) {
+      console.warn('⚠️ Usando cache antiguo como fallback');
+      return cachedData;
+    }
+    
+    throw new Error(`No se pudo cargar el archivo Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+  }
+}
+
+/**
  * Carga el archivo Excel (versión síncrona - solo desarrollo local)
+ * ⚠️ NO USAR EN PRODUCCIÓN - usar loadExcelDataAsync
  */
 export function loadExcelData(forceReload = false): Piece[] {
   const now = Date.now();
@@ -183,150 +362,6 @@ export function loadExcelData(forceReload = false): Piece[] {
     
   } catch (error) {
     console.error('❌ Error al cargar Excel:', error);
-    throw new Error(`No se pudo cargar el archivo Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-  }
-}
-
-/**
- * Versión ASYNC con cache busting (USAR EN PRODUCCIÓN)
- */
-export async function loadExcelDataAsync(forceReload = false): Promise<Piece[]> {
-  const now = Date.now();
-  
-  if (!forceReload && cachedData && (now - lastLoadTime) < CACHE_TTL) {
-    console.log('📦 Usando datos en caché');
-    return cachedData;
-  }
-
-  console.log('📂 Cargando datos desde Excel...');
-  
-  try {
-    let fileBuffer: Buffer;
-    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
-    
-    if (isProduction && process.env.EXCEL_BLOB_URL) {
-      console.log('☁️ Cargando desde Vercel Blob Storage...');
-      
-      // ⭐ CACHE BUSTING ⭐
-      const cacheBuster = `?cb=${Date.now()}&r=${Math.random().toString(36).substring(7)}`;
-      const url = process.env.EXCEL_BLOB_URL + cacheBuster;
-      
-      const response = await fetch(url, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const arrayBuffer = await response.arrayBuffer();
-      fileBuffer = Buffer.from(arrayBuffer);
-      console.log(`   ✅ Descargado: ${(fileBuffer.length / 1024).toFixed(2)} KB`);
-      
-    } else {
-      console.log('💻 Cargando desde archivo local...');
-      const excelPath = join(process.cwd(), 'data', 'PROYECTO_DESGLOSE_TORRES_martin.xlsx');
-      fileBuffer = readFileSync(excelPath);
-    }
-    
-    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-    const allData: Piece[] = [];
-    
-    workbook.SheetNames.forEach(sheetName => {
-      const worksheet = workbook.Sheets[sheetName];
-      const rawData = XLSX.utils.sheet_to_json(worksheet, { 
-        header: 1,
-        raw: false,
-        defval: ''
-      }) as any[][];
-      
-      if (rawData.length === 0) return;
-      
-      let headerRowIndex = -1;
-      let headers: string[] = [];
-      
-      for (let i = 0; i < Math.min(10, rawData.length); i++) {
-        const row = rawData[i];
-        const rowStr = row.join('|').toUpperCase();
-        
-        if (rowStr.includes('ID ITEM') || rowStr.includes('FABRICANTE') || 
-            rowStr.includes('PARTE') || (rowStr.includes('TIPO') && rowStr.includes('CABEZA'))) {
-          headerRowIndex = i;
-          headers = row.map(cell => String(cell || '').trim());
-          break;
-        }
-      }
-      
-      if (headerRowIndex === -1) return;
-      
-      const [tipo, fabricante] = extractTipoFabricante(sheetName);
-      
-      for (let i = headerRowIndex + 1; i < rawData.length; i++) {
-        const rowArray = rawData[i];
-        const row: any = {};
-        headers.forEach((header, index) => {
-          if (header) row[header] = rowArray[index] || '';
-        });
-        
-        const getColumnValue = (possibleNames: string[]) => {
-          for (const name of possibleNames) {
-            if (row[name] !== undefined) return row[name];
-            const foundKey = Object.keys(row).find(k => 
-              k.toLowerCase() === name.toLowerCase()
-            );
-            if (foundKey) return row[foundKey];
-          }
-          return '';
-        };
-        
-        const piece: Piece = {
-          id_item: normalizeValue(getColumnValue(['ID Item', 'IDItem', 'ID_Item', 'Material'])),
-          texto_breve: normalizeValue(getColumnValue(['Texto breve del material', 'Texto breve', 'TextoBreve', 'Texto'])),
-          tipo: tipo || normalizeValue(getColumnValue(['TIPO', 'Tipo', 'tipo'])),
-          fabricante: fabricante || normalizeValue(getColumnValue(['FABRICANTE', 'Fabricante', 'fabricante'])),
-          cabeza: normalizeValue(getColumnValue(['Cabeza', 'cabeza'])),
-          parte_division: normalizeValue(getColumnValue(['Parte (Division)', 'Parte', 'Division', 'Parte_Division', 'Parte(Division)'])),
-          cuerpo: normalizeValue(getColumnValue(['Cuerpo', 'cuerpo'])),
-          tramo: normalizeValue(getColumnValue(['Tramo', 'tramo'])),
-          posicion: normalizeValue(getColumnValue(['Posición', 'Posicion', 'posicion', 'Pos'])),
-          descripcion: normalizeValue(getColumnValue(['Descripción', 'Descripcion', 'descripcion'])),
-          long_2_principal: normalizeValue(getColumnValue(['Long 2 (Principal)', 'Long 2', 'Long2', 'Long_2', 'Long 2(Principal)'])),
-          cantidad_x_torre: parseNumber(getColumnValue(['Cantidad x Torre', 'Cantidad', 'Cant x Torre', 'Cant', 'Cantidad Torre'])),
-          peso_unitario: parseNumber(getColumnValue(['Peso Unitario', 'Peso', 'PesoUnitario', 'Peso Unit'])),
-          plano: normalizeValue(getColumnValue(['PLANO', 'Plano', 'plano'])),
-          mod_plano: normalizeValue(getColumnValue(['Mod Plano', 'ModPlano', 'Mod_Plano'])),
-          hoja_origen: sheetName
-        };
-        
-        const hasMinimumData = 
-          (piece.id_item && piece.id_item !== '-') || 
-          (piece.parte_division && piece.parte_division !== '-') ||
-          (piece.descripcion && piece.descripcion !== '-' && piece.descripcion.length > 3);
-        
-        if (hasMinimumData) {
-          allData.push(piece);
-        }
-      }
-    });
-    
-    cachedData = allData;
-    lastLoadTime = now;
-    
-    return allData;
-    
-  } catch (error) {
-    console.error('❌ Error al cargar Excel:', error);
-    
-    if (cachedData && cachedData.length > 0) {
-      console.warn('⚠️ Usando cache antiguo como fallback');
-      return cachedData;
-    }
-    
     throw new Error(`No se pudo cargar el archivo Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
   }
 }
