@@ -488,6 +488,7 @@ export function calculateMaterials(
   if (filters.tipo) data = data.filter(p => p.tipo === filters.tipo);
   if (filters.fabricante) data = data.filter(p => p.fabricante === filters.fabricante);
   if (filters.cabeza) data = data.filter(p => p.cabeza === filters.cabeza);
+  if (filters.cuerpo) data = data.filter(p => p.cuerpo === filters.cuerpo);
   
   const calculatedPieces: CalculatedPiece[] = [];
   
@@ -617,6 +618,7 @@ export async function calculateMaterialsAsync(
   if (filters.tipo) data = data.filter(p => p.tipo === filters.tipo);
   if (filters.fabricante) data = data.filter(p => p.fabricante === filters.fabricante);
   if (filters.cabeza) data = data.filter(p => p.cabeza === filters.cabeza);
+  if (filters.cuerpo) data = data.filter(p => p.cuerpo === filters.cuerpo); 
   
   const calculatedPieces: CalculatedPiece[] = [];
   

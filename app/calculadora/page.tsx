@@ -26,7 +26,6 @@ interface FilterOptions {
   CABEZA: string[];
   CUERPO: string[];
   PARTE_DIVISION: string[];
-
 }
 
 interface SelectedPart {
@@ -63,9 +62,10 @@ export default function CalculadoraPage() {
   // Hook para el visualizador de planos
   const { isOpen, planoUrl, planoName, openViewer, closeViewer } = usePlanoViewer();
 
+  // ✅ FIX: Agregar cuerpo como dependencia para actualizar las partes
   useEffect(() => {
     loadOptions();
-  }, [filters.tipo, filters.fabricante, filters.cabeza]);
+  }, [filters.tipo, filters.fabricante, filters.cabeza, filters.cuerpo]);
 
   useEffect(() => {
     if (!filters.tipo || !filters.fabricante) {
@@ -86,71 +86,45 @@ export default function CalculadoraPage() {
       if (filters.cabeza) params.append('CABEZA', filters.cabeza);
       if (filters.cuerpo) params.append('CUERPO', filters.cuerpo);
 
-      // Simulación de fetch para el preview si no hay backend
-      // const response = await fetch(`/api/options?${params}`);
-      // const data = await response.json();
-      
-      // Mock data para que funcione la UI en el preview
-      const mockData = {
-        success: true,
-        options: {
-          TIPO: ['A', 'B', 'C'],
-          FABRICANTE: ['Fab1', 'Fab2'],
-          CABEZA: ['C1', 'C2'],
-          CUERPO: ['CU1', 'CU2'],
-          PARTE_DIVISION: ['Base', 'Cuerpo', 'Cruceta']
+      const response = await fetch(`/api/options?${params}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setOptions(data.options);
+          updatePartsList(data.options.PARTE_DIVISION);
         }
-      };
-      
-      // Usamos mockData si falla el fetch real (para robustez)
-      try {
-          const response = await fetch(`/api/options?${params}`);
-          if (response.ok) {
-             const data = await response.json();
-             if (data.success) {
-                setOptions(data.options);
-                updatePartsList(data.options.PARTE_DIVISION);
-             }
-          } else {
-             // Fallback
-             setOptions(mockData.options);
-             updatePartsList(mockData.options.PARTE_DIVISION);
-          }
-      } catch (e) {
-          console.warn("Usando datos de prueba (API no disponible)");
-          setOptions(mockData.options);
-          updatePartsList(mockData.options.PARTE_DIVISION);
       }
-
     } catch (error) {
       console.error('Error loading options:', error);
     }
   };
 
   const updatePartsList = (availableParts: string[]) => {
-      if (availableParts && availableParts.length > 0) {
-          const newParts: Record<string, SelectedPart> = {};
-          availableParts.forEach((partName: string) => {
-            // Preservar selección si ya existe
-            const existingPart = parts[partName]; 
-            newParts[partName] = {
-              part: partName,
-              quantity: existingPart ? existingPart.quantity : 1,
-              selected: existingPart ? existingPart.selected : false
-            };
-          });
-          setParts(newParts);
-        } else {
-          setParts({}); 
-        }
+    if (availableParts && availableParts.length > 0) {
+      const newParts: Record<string, SelectedPart> = {};
+      availableParts.forEach((partName: string) => {
+        // Preservar selección si ya existe
+        const existingPart = parts[partName]; 
+        newParts[partName] = {
+          part: partName,
+          quantity: existingPart ? existingPart.quantity : 1,
+          selected: existingPart ? existingPart.selected : false
+        };
+      });
+      setParts(newParts);
+    } else {
+      setParts({}); 
+    }
   };
 
   const handleFilterChange = (field: string, value: string) => {
     let newFilters = { ...filters, [field]: value };
     if (field === 'tipo') {
-      newFilters = { ...newFilters, fabricante: '', cabeza: '' };
+      newFilters = { ...newFilters, fabricante: '', cabeza: '', cuerpo: '' };
     } else if (field === 'fabricante') {
-      newFilters = { ...newFilters, cabeza: '' };
+      newFilters = { ...newFilters, cabeza: '', cuerpo: '' };
+    } else if (field === 'cabeza') {
+      newFilters = { ...newFilters, cuerpo: '' };
     }
     
     setFilters(newFilters);
@@ -193,54 +167,33 @@ export default function CalculadoraPage() {
     setMessage('⏳ Calculando materiales...');
     
     try {
-      // Simulación para preview
-      // const response = await fetch('/api/calculate', ...);
+      // ✅ FIX: Incluir cuerpo en los filtros enviados al backend
+      const response = await fetch('/api/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filters: {
+            tipo: filters.tipo,
+            fabricante: filters.fabricante,
+            cabeza: filters.cabeza,
+            cuerpo: filters.cuerpo  // ✅ Agregar cuerpo
+          },
+          parts: selectedParts.map(p => ({ part: p.part, quantity: p.quantity }))
+        })
+      });
       
-      // Mock response
-      const mockResults = selectedParts.map((p, i) => ({
-          id_item: `ITM-${i}00`,
-          texto_breve: `Material ${p.part}`,
-          descripcion: `Descripción detallada del material para ${p.part}`,
-          parte_division: p.part,
-          posicion: '1',
-          cantidad_original: 10,
-          cantidad_calculada: 10 * p.quantity,
-          peso_unitario: 5.5,
-          peso_total: 5.5 * 10 * p.quantity,
-          long_2_principal: 'N/A',
-          plano: 'PLANO-001',
-          mod_plano: '-'
-      }));
-
-      try {
-        const response = await fetch('/api/calculate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-            filters,
-            parts: selectedParts.map(p => ({ part: p.part, quantity: p.quantity }))
-            })
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-                setResults(data.results);
-                setTotals(data.totals);
-                setMessage(`✅ ${data.results.length} piezas diferentes encontradas`);
-            } else {
-                 setMessage(`❌ Error: ${data.message}`);
-            }
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setResults(data.results);
+          setTotals(data.totals);
+          setMessage(`✅ ${data.results.length} piezas diferentes encontradas`);
         } else {
-            throw new Error("API Error");
+          setMessage(`❌ Error: ${data.message}`);
         }
-      } catch (e) {
-         console.warn("Usando cálculo simulado");
-         setResults(mockResults);
-         setTotals({ total_pieces: mockResults.reduce((a,b)=>a+b.cantidad_calculada,0), total_weight: mockResults.reduce((a,b)=>a+b.peso_total,0) });
-         setMessage(`✅ ${mockResults.length} piezas calculadas (Simulación)`);
+      } else {
+        throw new Error("API Error");
       }
-
     } catch (error) {
       setMessage(`🚨 Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
@@ -255,10 +208,10 @@ export default function CalculadoraPage() {
   };
 
   const exportToExcel = () => {
-  if (results.length === 0) {
-    showModal('⚠️ No hay datos para exportar');
-    return;
-  }
+    if (results.length === 0) {
+      showModal('⚠️ No hay datos para exportar');
+      return;
+    }
 
     let html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -367,7 +320,6 @@ export default function CalculadoraPage() {
   };
 
   return (
-    // Eliminamos el estilo inline del gradiente y usamos z-10 para estar sobre el fondo global
     <div className="min-h-screen p-4 sm:p-8 flex flex-col items-center relative z-10 w-full">
       
       {/* Contenedor Glassmorphism */}
