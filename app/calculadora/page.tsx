@@ -24,7 +24,9 @@ interface FilterOptions {
   TIPO: string[];
   FABRICANTE: string[];
   CABEZA: string[];
+  CUERPO: string[];
   PARTE_DIVISION: string[];
+
 }
 
 interface SelectedPart {
@@ -47,6 +49,7 @@ export default function CalculadoraPage() {
     TIPO: [],
     FABRICANTE: [],
     CABEZA: [],
+    CUERPO: [],
     PARTE_DIVISION: []
   });
   
@@ -94,6 +97,7 @@ export default function CalculadoraPage() {
           TIPO: ['A', 'B', 'C'],
           FABRICANTE: ['Fab1', 'Fab2'],
           CABEZA: ['C1', 'C2'],
+          CUERPO: ['CU1', 'CU2'],
           PARTE_DIVISION: ['Base', 'Cuerpo', 'Cruceta']
         }
       };
@@ -397,6 +401,7 @@ export default function CalculadoraPage() {
             <FilterSelect label="TIPO" value={filters.tipo} options={options.TIPO} onChange={(v) => handleFilterChange('tipo', v)} />
             <FilterSelect label="FABRICANTE" value={filters.fabricante} options={options.FABRICANTE} onChange={(v) => handleFilterChange('fabricante', v)} />
             <FilterSelect label="CABEZA" value={filters.cabeza} options={options.CABEZA} onChange={(v) => handleFilterChange('cabeza', v)} />
+            <FilterSelect label="CUERPO" value={filters.cuerpo} options={options.CUERPO || []} onChange={(v) => handleFilterChange('cuerpo', v)} />
           </div>
 
           <div className="border-t border-gray-200 pt-6 mt-6">
