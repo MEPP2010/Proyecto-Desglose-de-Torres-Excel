@@ -39,7 +39,8 @@ export default function CalculadoraPage() {
   const [filters, setFilters] = useState({
     tipo: '',
     fabricante: '',
-    cabeza: ''
+    cabeza: '',
+    cuerpo: ''
   });
   
   const [options, setOptions] = useState<FilterOptions>({
@@ -80,6 +81,7 @@ export default function CalculadoraPage() {
       if (filters.tipo) params.append('TIPO', filters.tipo);
       if (filters.fabricante) params.append('FABRICANTE', filters.fabricante);
       if (filters.cabeza) params.append('CABEZA', filters.cabeza);
+      if (filters.cuerpo) params.append('CUERPO', filters.cuerpo);
 
       // Simulación de fetch para el preview si no hay backend
       // const response = await fetch(`/api/options?${params}`);
@@ -241,7 +243,7 @@ export default function CalculadoraPage() {
   };
 
   const handleReset = () => {
-    setFilters({ tipo: '', fabricante: '', cabeza: '' });
+    setFilters({ tipo: '', fabricante: '', cabeza: '', cuerpo: '' });
     setParts({});
     setResults([]);
     setShowResults(false);
