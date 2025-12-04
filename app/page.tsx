@@ -124,15 +124,27 @@ export default function BuscadorPage() {
     }
   };
 
-  const handleViewPlano = (plano: string, modPlano: string, itemId: string) => {
-    if (!plano || plano === '-') {
-      alert('⚠️ Este ítem no tiene un plano asociado');
-      return;
+  const handleViewPlano = async (plano: string, modPlano: string, itemId: string) => {
+  if (!plano || plano === '-') {
+    alert('⚠️ Este ítem no tiene un plano asociado');
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/buscar-plano?plano=${encodeURIComponent(plano)}`);
+    const data = await response.json();
+
+    if (data.success && data.url) {
+      const planoTitle = `${itemId} - ${plano}${modPlano && modPlano !== '-' ? ` (Mod: ${modPlano})` : ''}`;
+      openViewer(data.url, planoTitle);
+    } else {
+      alert(`⚠️ No se encontró el plano "${plano}.jpg" en ninguna carpeta`);
     }
-    const planoUrl = `/planos/${plano}.jpg`;
-    const planoTitle = `${itemId} - ${plano}${modPlano && modPlano !== '-' ? ` (Mod: ${modPlano})` : ''}`;
-    openViewer(planoUrl, planoTitle);
-  };
+  } catch (error) {
+    console.error('Error al buscar plano:', error);
+    alert('❌ Error al buscar el plano. Por favor intenta nuevamente.');
+  }
+};
 
   const handleUploadSuccess = () => {
     // Recargar la página completa para obtener los nuevos datos
