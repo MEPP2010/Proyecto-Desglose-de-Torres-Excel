@@ -16,7 +16,7 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
   const [isLoading, setIsLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
-  const [rotation, setrotation ] = useState(0);
+  const [rotation, setRotation] = useState(0); // ✅ CORREGIDO: Cambié setrotation por setRotation
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -24,6 +24,7 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
   useEffect(() => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
+    setRotation(0); // ✅ Resetear rotación también
     setIsLoading(true);
     setImageError(false);
     setImageSize({ width: 0, height: 0 });
@@ -74,7 +75,6 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
     setScale(prev => Math.max(0.08, prev / 1.2));
   };
 
-
   const handleFitToScreen = () => {
     fitImageToScreen();
   };
@@ -105,11 +105,11 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
   };
 
   const handleRotate = () => {
-    setrotation((prev) => (prev + 90) % 360);
+    setRotation((prev) => (prev + 90) % 360);
   };
 
   const handleRotateLeft = () => {
-    setrotation((prev) => (prev - 90 + 360) % 360);
+    setRotation((prev) => (prev - 90 + 360) % 360);
   };
 
   const handleDownload = () => {
@@ -127,7 +127,9 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
         <div className="flex justify-between items-center mb-2 sm:mb-0">
           <div className="flex-1 min-w-0">
             <h3 className="text-sm sm:text-xl font-bold truncate">📐 {planoName || 'Plano'}</h3>
-            <span className="text-xs sm:text-sm text-gray-400 hidden sm:inline">Zoom: {Math.round(scale * 100)}%</span>
+            <span className="text-xs sm:text-sm text-gray-400 hidden sm:inline">
+              Zoom: {Math.round(scale * 100)}% | Rotación: {rotation}°
+            </span>
           </div>
           <button
             onClick={onClose}
@@ -155,18 +157,18 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
             🔍+
           </button>
           <button
-            onClick={handleRotate}
-            className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded transition text-sm"
-            title="Rotar derecha"
-          >
-            ↺ Rotar
-          </button>
-          <button
             onClick={handleRotateLeft}
             className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded transition text-sm"
             title="Rotar izquierda"
           >
-            ↻ Rotar
+            ↺ Rotar ←
+          </button>
+          <button
+            onClick={handleRotate}
+            className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded transition text-sm"
+            title="Rotar derecha"
+          >
+            ↻ Rotar →
           </button>
           <button
             onClick={handleFitToScreen}
@@ -207,13 +209,13 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
             🔍+
           </button>
           <button
-            onClick={handleRotate}
+            onClick={handleRotateLeft}
             className="bg-gray-700 hover:bg-gray-600 px-2 py-2 rounded transition text-sm flex-shrink-0"
           >
             ↺
           </button>
           <button
-            onClick={handleRotateLeft}
+            onClick={handleRotate}
             className="bg-gray-700 hover:bg-gray-600 px-2 py-2 rounded transition text-sm flex-shrink-0"
           >
             ↻
@@ -289,7 +291,9 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
               setImageError(true);
             }}
             style={{
-              display: imageError ? 'none' : 'block'
+              display: imageError ? 'none' : 'block',
+              transform: `rotate(${rotation}deg)`, // ✅ AGREGADO: Aplica la rotación
+              transition: 'transform 0.3s ease-out' // ✅ AGREGADO: Animación suave
             }}
           />
         </div>
@@ -309,6 +313,7 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
       <div className="bg-gray-800 text-white text-sm p-2 text-center">
         <span className="text-gray-400">
           Zoom: {Math.round(scale * 100)}% | 
+          Rotación: {rotation}° |
           Posición: X: {Math.round(position.x)}px, Y: {Math.round(position.y)}px | 
           Dimensiones: {imageSize.width} × {imageSize.height} px
         </span>
