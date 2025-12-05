@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PlanoViewer, { usePlanoViewer } from '@/components/PlanoViewer';
 import UploadExcelModal from '@/components/UploadExcelModal';
+import indicePlanos from '@/scripts/generar-indice-planos';
 
 interface Piece {
   id_item: string;
@@ -124,27 +125,22 @@ export default function BuscadorPage() {
     }
   };
 
-  const handleViewPlano = async (plano: string, modPlano: string, itemId: string) => {
+  const handleViewPlano = (plano: string, modPlano: string, itemId: string) => {
   if (!plano || plano === '-') {
     alert('⚠️ Este ítem no tiene un plano asociado');
     return;
   }
 
-  try {
-    const response = await fetch(`/api/buscar-plano?plano=${encodeURIComponent(plano)}`);
-    const data = await response.json();
-
-    if (data.success && data.url) {
-      const planoTitle = `${itemId} - ${plano}${modPlano && modPlano !== '-' ? ` (Mod: ${modPlano})` : ''}`;
-      openViewer(data.url, planoTitle);
-    } else {
-      alert(`⚠️ No se encontró el plano "${plano}.jpg" en ninguna carpeta`);
-    }
-  } catch (error) {
-    console.error('Error al buscar plano:', error);
-    alert('❌ Error al buscar el plano. Por favor intenta nuevamente.');
+  const planoUrl = indicePlanos[plano as keyof typeof indicePlanos];
+  
+  if (planoUrl) {
+    const planoTitle = `${itemId} - ${plano}${modPlano && modPlano !== '-' ? ` (Mod: ${modPlano})` : ''}`;
+    openViewer(planoUrl, planoTitle);
+  } else {
+    alert(`⚠️ No se encontró el plano "${plano}.jpg"`);
   }
-};
+
+  }; 
 
   const handleUploadSuccess = () => {
     // Recargar la página completa para obtener los nuevos datos
