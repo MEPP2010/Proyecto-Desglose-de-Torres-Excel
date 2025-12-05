@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PlanoViewer, { usePlanoViewer } from '@/components/PlanoViewer';
 import UploadExcelModal from '@/components/UploadExcelModal';
-import indicePlanos from '@/scripts/generar-indice-planos';
+import indicePlanos from '@/public/indice-planos.json';
 
 interface Piece {
   id_item: string;
