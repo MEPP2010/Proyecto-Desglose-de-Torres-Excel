@@ -16,6 +16,7 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
   const [isLoading, setIsLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [rotation, setrotation ] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
@@ -38,7 +39,7 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(0.23, Math.min(5, scale * delta));
+    const newScale = Math.max(0.08, Math.min(5, scale * delta));
     setScale(newScale);
   };
 
@@ -70,13 +71,9 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
   };
 
   const handleZoomOut = () => {
-    setScale(prev => Math.max(0.23, prev / 1.2));
+    setScale(prev => Math.max(0.08, prev / 1.2));
   };
 
-  const handleReset = () => {
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
-  };
 
   const handleFitToScreen = () => {
     fitImageToScreen();
@@ -108,8 +105,11 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
   };
 
   const handleRotate = () => {
-    // Rotar 90 grados (podrías implementar esto con transform)
-    alert('Funcionalidad de rotación - próximamente');
+    setrotation((prev) => (prev + 90) % 360);
+  };
+
+  const handleRotateLeft = () => {
+    setrotation((prev) => (prev - 90 + 360) % 360);
   };
 
   const handleDownload = () => {
@@ -155,11 +155,18 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
             🔍+
           </button>
           <button
-            onClick={handleReset}
+            onClick={handleRotate}
             className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded transition text-sm"
-            title="Restablecer"
+            title="Rotar derecha"
           >
-            ↺ Reset
+            ↺ Rotar
+          </button>
+          <button
+            onClick={handleRotateLeft}
+            className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded transition text-sm"
+            title="Rotar izquierda"
+          >
+            ↻ Rotar
           </button>
           <button
             onClick={handleFitToScreen}
@@ -200,10 +207,16 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
             🔍+
           </button>
           <button
-            onClick={handleReset}
+            onClick={handleRotate}
             className="bg-gray-700 hover:bg-gray-600 px-2 py-2 rounded transition text-sm flex-shrink-0"
           >
             ↺
+          </button>
+          <button
+            onClick={handleRotateLeft}
+            className="bg-gray-700 hover:bg-gray-600 px-2 py-2 rounded transition text-sm flex-shrink-0"
+          >
+            ↻
           </button>
           <button
             onClick={handleFitToScreen}
