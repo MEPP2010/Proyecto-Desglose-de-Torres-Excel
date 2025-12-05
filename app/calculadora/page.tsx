@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import PlanoViewer, { usePlanoViewer } from '@/components/PlanoViewer';
+import indicePlanos from '@/public/indice-planos.json';
 
 // --- Interfaces ---
 
@@ -307,17 +308,22 @@ export default function CalculadoraPage() {
     alert(msg);
   };
 
-  const handleViewPlano = (plano: string | undefined, modPlano: string | undefined, itemId: string) => {
-    if (!plano || plano === '-') {
-      alert('⚠️ Este ítem no tiene un plano asociado');
-      return;
-    }
-    
-    const planoUrl = `/planos/${plano}.jpg`;
+  const handleViewPlano = (plano: string, modPlano: string, itemId: string) => {
+  if (!plano || plano === '-') {
+    alert('⚠️ Este ítem no tiene un plano asociado');
+    return;
+  }
+
+  const planoUrl = indicePlanos[plano as keyof typeof indicePlanos];
+  
+  if (planoUrl) {
     const planoTitle = `${itemId} - ${plano}${modPlano && modPlano !== '-' ? ` (Mod: ${modPlano})` : ''}`;
-    
     openViewer(planoUrl, planoTitle);
-  };
+  } else {
+    alert(`⚠️ No se encontró el plano "${plano}.jpg"`);
+  }
+
+  }; 
 
   return (
     <div className="min-h-screen p-4 sm:p-8 flex flex-col items-center relative z-10 w-full">
