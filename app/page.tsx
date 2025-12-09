@@ -126,66 +126,65 @@ export default function BuscadorPage() {
   };
 
   const handleViewPlano = (plano: string, modPlano: string, itemId: string) => {
-  if (!plano || plano === '-') {
-    alert('⚠️ Este ítem no tiene un plano asociado');
-    return;
-  }
+    if (!plano || plano === '-') {
+      alert('⚠️ Este ítem no tiene un plano asociado');
+      return;
+    }
 
-  const planoUrl = indicePlanos[plano as keyof typeof indicePlanos];
-  
-  if (planoUrl) {
-    const planoTitle = `${itemId} - ${plano}${modPlano && modPlano !== '-' ? ` (Mod: ${modPlano})` : ''}`;
-    openViewer(planoUrl, planoTitle);
-  } else {
-    alert(`⚠️ No se encontró el plano "${plano}.jpg"`);
-  }
-
+    const planoUrl = indicePlanos[plano as keyof typeof indicePlanos];
+    
+    if (planoUrl) {
+      const planoTitle = `${itemId} - ${plano}${modPlano && modPlano !== '-' ? ` (Mod: ${modPlano})` : ''}`;
+      openViewer(planoUrl, planoTitle);
+    } else {
+      alert(`⚠️ No se encontró el plano "${plano}.jpg"`);
+    }
   }; 
 
   const handleUploadSuccess = () => {
-    // Recargar la página completa para obtener los nuevos datos
     window.location.reload();
   };
 
   return (
     <div className="p-4 sm:p-8 min-h-screen flex flex-col items-center w-full">
       
-      {/* --- TARJETA DE CRISTAL (Glassmorphism) --- */}
-      <div className="w-full max-w-7xl bg-white/90 backdrop-blur-md p-6 sm:p-10 rounded-2xl shadow-2xl border border-white/40 mt-4 mb-20 relative z-20">
+      {/* --- CONTENEDOR PRINCIPAL LIQUID GLASS --- */}
+      {/* Se usa animate-slide-up para entrada suave y glass-container para el efecto visual */}
+      <div className="w-full max-w-7xl glass-container rounded-3xl p-6 sm:p-10 mt-4 mb-20 relative z-20 animate-slide-up">
         
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 border-b border-gray-300 pb-4 gap-4">
+        {/* Header con título y botones */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 border-b border-gray-200/50 pb-6 gap-6">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-[#003594]">
+            <h1 className="text-4xl sm:text-5xl font-extrabold text-[#003594] tracking-tight drop-shadow-sm">
               Buscador de Materiales
             </h1>
-            <p className="text-gray-500 text-sm mt-1">Sistema de gestión de torres de transmisión</p>
+            <p className="text-gray-600 font-medium mt-2 text-lg">Sistema inteligente de gestión de torres de transmisión</p>
           </div>
           
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-4 flex-wrap">
             {/* Botón Actualizar Desglose */}
             <button
               onClick={() => setUploadModalOpen(true)}
-              className="group bg-green-600 hover:bg-green-700 text-white transition-all duration-200 font-bold py-3 px-6 rounded-xl shadow-lg flex items-center gap-2 hover:-translate-y-1"
+              className="btn-shine bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-bold py-3 px-6 rounded-2xl shadow-lg hover:shadow-green-500/30 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
             >
-              <span>📤</span>
-              <span>Actualizar Desglose</span>
+              <span className="text-xl">📤</span>
+              <span>Actualizar BD</span>
             </button>
 
             {/* Botón Calculadora */}
             <Link
               href="/calculadora"
-              className="group bg-[#ff6600] hover:bg-[#e65c00] text-white transition-all duration-200 font-bold py-3 px-6 rounded-xl shadow-lg flex items-center gap-2 hover:-translate-y-1"
+              className="btn-shine bg-gradient-to-r from-[#ff6600] to-[#ff8533] hover:from-[#e65c00] hover:to-[#ff6600] text-white font-bold py-3 px-6 rounded-2xl shadow-lg hover:shadow-orange-500/30 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
             >
-              <span>Calculadora de Torres</span>
+              <span>Calculadora</span>
               <span className="group-hover:translate-x-1 transition-transform">➡️</span>
             </Link>
           </div>
         </div>
 
-        {/* Filtros */}
-        <form onSubmit={handleSearch} className="bg-gray-50/80 p-6 rounded-xl border border-gray-200 shadow-inner">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        {/* Panel de Filtros (Glass Card) */}
+        <form onSubmit={handleSearch} className="glass-card p-8 rounded-2xl mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5 mb-8">
             <FilterSelect label="TIPO" value={filters.tipo} options={options.TIPO} onChange={(v) => handleFilterChange('tipo', v)} />
             <FilterSelect label="FABRICANTE" value={filters.fabricante} options={options.FABRICANTE} onChange={(v) => handleFilterChange('fabricante', v)} />
             <FilterSelect label="CABEZA" value={filters.cabeza} options={options.CABEZA} onChange={(v) => handleFilterChange('cabeza', v)} />
@@ -198,72 +197,82 @@ export default function BuscadorPage() {
              <button
               type="submit"
               disabled={loading}
-              className="w-full md:w-1/3 py-3 px-8 bg-[#003594] hover:bg-[#002a75] text-white font-bold rounded-lg transition duration-200 shadow-md disabled:opacity-50 flex justify-center items-center gap-2"
+              className="btn-shine w-full md:w-1/3 py-4 px-8 bg-[#003594] hover:bg-[#002a75] text-white font-bold rounded-xl transition duration-300 shadow-lg hover:shadow-blue-900/40 disabled:opacity-50 flex justify-center items-center gap-3 text-lg"
             >
-              {loading ? 'Buscando...' : '🔍 Buscar Desglose'}
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Buscando...
+                </>
+              ) : (
+                <>🔍 Buscar Desglose</>
+              )}
             </button>
           </div>
         </form>
 
         {/* Mensaje de Estado */}
-        <div className="mt-6 flex items-center gap-2">
-          <div className={`h-3 w-3 rounded-full ${message.includes('✅') ? 'bg-green-500' : message.includes('❌') ? 'bg-red-500' : 'bg-gray-400'}`}></div>
-          <p className="font-medium text-gray-700">{message}</p>
+        <div className="mb-4 flex items-center gap-3 px-2">
+          <div className={`h-4 w-4 rounded-full shadow-inner ${message.includes('✅') ? 'bg-green-500' : message.includes('❌') ? 'bg-red-500' : 'bg-gray-400'}`}></div>
+          <p className="font-semibold text-gray-800 text-lg drop-shadow-sm">{message}</p>
         </div>
 
-        {/* Tabla de Resultados */}
-        <div className="mt-6 border border-gray-200 rounded-xl overflow-hidden shadow-lg bg-white">
-          <div className="overflow-x-auto max-h-[55vh]">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-100 sticky top-0 z-10 shadow-sm">
+        {/* Tabla de Resultados (Semi-transparente) */}
+        <div className="glass-card rounded-2xl overflow-hidden border border-white/50">
+          <div className="overflow-x-auto max-h-[60vh] custom-scrollbar">
+            <table className="min-w-full divide-y divide-gray-200/50">
+              <thead className="bg-[#003594]/90 backdrop-blur-sm sticky top-0 z-10 text-white shadow-md">
                 <tr>
                   {[
                     'Material', 'Texto Breve', 'Tipo', 'Fabricante', 'Cabeza', 
                     'Parte', 'Cuerpo', 'Tramo', 'Pos.', 'Descripción', 
                     'Long 2', 'Cant.', 'Peso U.', 'Plano', 'Acción'
                   ].map(header => (
-                    <th key={header} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider whitespace-nowrap bg-gray-100">
+                    <th key={header} className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-white/10 last:border-none">
                       {header}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-gray-200/40">
                 {results.length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="px-6 py-10 text-center text-gray-400 italic">
-                      Sin resultados para mostrar
+                    <td colSpan={15} className="px-6 py-12 text-center text-gray-500 font-medium italic bg-white/40">
+                      No hay resultados para mostrar. Ajusta los filtros arriba.
                     </td>
                   </tr>
                 ) : (
                   results.map((piece, idx) => (
-                    <tr key={idx} className="hover:bg-blue-50 transition duration-150 group">
-                      <td className="px-4 py-2 text-sm font-medium text-gray-900">{piece.id_item || '-'}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{piece.texto_breve || '-'}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{piece.tipo}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{piece.fabricante}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{piece.cabeza}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{piece.parte_division}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{piece.cuerpo}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{piece.tramo}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{piece.posicion}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600 truncate max-w-[200px]" title={piece.descripcion}>{piece.descripcion}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{piece.long_2_principal}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600 font-semibold">{piece.cantidad_x_torre}</td>
-                      <td className="px-4 py-2 text-sm text-gray-600">
+                    <tr key={idx} className="hover:bg-blue-50/60 transition duration-150 group bg-white/20 odd:bg-white/10">
+                      <td className="px-4 py-3 text-sm font-bold text-[#003594]">{piece.id_item || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-800">{piece.texto_breve || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{piece.tipo}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{piece.fabricante}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{piece.cabeza}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{piece.parte_division}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{piece.cuerpo}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{piece.tramo}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 font-medium">{piece.posicion}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 truncate max-w-[200px]" title={piece.descripcion}>{piece.descripcion}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700">{piece.long_2_principal}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 font-bold bg-white/30 text-center rounded">{piece.cantidad_x_torre}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 text-right">
                         {piece.peso_unitario ? `${Number(piece.peso_unitario).toFixed(2)}` : '-'}
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-600">{piece.plano || '-'}</td>
-                      <td className="px-4 py-2 text-sm">
+                      <td className="px-4 py-3 text-sm text-gray-700">{piece.plano || '-'}</td>
+                      <td className="px-4 py-3 text-sm">
                         {piece.plano && piece.plano !== '-' ? (
                           <button
                             onClick={() => handleViewPlano(piece.plano, piece.mod_plano, piece.id_item)}
-                            className="bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white px-3 py-1 rounded-md text-xs font-bold transition-colors"
+                            className="bg-blue-100/80 hover:bg-[#003594] text-[#003594] hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm border border-blue-200"
                           >
-                            VER
+                            VER PLANO
                           </button>
                         ) : (
-                          <span className="text-gray-300 text-xs select-none">N/A</span>
+                          <span className="text-gray-400 text-xs select-none opacity-50">N/A</span>
                         )}
                       </td>
                     </tr>
@@ -301,12 +310,12 @@ function FilterSelect({ label, value, options, onChange }: {
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-col">
-      <label className="mb-1 text-xs font-bold text-gray-500 uppercase tracking-wide">{label}</label>
+    <div className="flex flex-col group">
+      <label className="mb-2 text-xs font-bold text-[#003594] uppercase tracking-wider group-hover:text-[#ff6600] transition-colors">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="p-2.5 bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-[#003594] focus:border-[#003594] block w-full shadow-sm hover:border-gray-400 transition-colors"
+        className="glass-input p-3 w-full rounded-xl text-sm font-medium text-gray-700 outline-none cursor-pointer"
       >
         <option value="">Todos</option>
         {options.map(opt => (

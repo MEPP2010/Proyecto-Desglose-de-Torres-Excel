@@ -13,35 +13,105 @@ body {
   color: rgb(255, 255, 255);
   margin: 0;
   padding: 0;
-
+  overflow-x: hidden; /* Evita scroll horizontal no deseado */
 }
 
-/* Personalización de scrollbar para que combine con el fondo azul */
+/* Scrollbar personalizada "Liquid" */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(114, 114, 114, 0.5);
-  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(114, 114, 114, 0.8);
+  background: rgba(255, 255, 255, 0.5);
 }
 
-/* Utilidades para inputs y selects en modo oscuro/azul */
+/* Utilidades generales */
 select, input {
-  color: #1f2937; /* Texto oscuro para legibilidad en inputs blancos */
+  color: #1f2937;
 }
 
-/* Animación suave para las mariposas */
+/* --- CLASES LIQUID GLASS CUSTOM --- */
+
+/* Contenedor Principal de Cristal */
+.glass-container {
+  background: rgba(255, 255, 255, 0.75); /* Más transparente para ver el fondo */
+  backdrop-filter: blur(20px); /* Blur intenso para legibilidad */
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.6); /* Borde brillante */
+  box-shadow: 0 8px 32px 0 rgba(0, 53, 148, 0.25); /* Sombra azulada suave */
+}
+
+/* Tarjetas internas (filtros, items) con efecto "flotante" */
+.glass-card {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.65);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Inputs y Selects estilo cristal */
+.glass-input {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(209, 213, 219, 0.5) !important;
+  backdrop-filter: blur(4px);
+  transition: all 0.2s;
+}
+
+.glass-input:focus {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: var(--isa-blue) !important;
+  box-shadow: 0 0 0 3px rgba(0, 53, 148, 0.1) !important;
+}
+
+/* Botones con brillo */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(45deg) translate(-100%, -100%);
+  transition: transform 0.6s;
+}
+
+.btn-shine:hover::after {
+  transform: rotate(45deg) translate(100%, 100%);
+}
+
+/* Animaciones */
 @keyframes float {
   0% { transform: translateY(0px) rotate(0deg); }
   50% { transform: translateY(-10px) rotate(2deg); }
@@ -50,4 +120,19 @@ select, input {
 
 .animate-float {
   animation: float 6s ease-in-out infinite;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
