@@ -24,14 +24,84 @@ export default function RootLayout({
         {/* --- CAPA DE FONDO (Imágenes Decorativas) --- */}
         <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
           
-          {/* 1. Mariposas (Esquina superior izquierda) */}
-          {/* CAMBIO: Se cambió 'left-10' a 'left-0' para moverlas totalmente a la izquierda */}
-          <div className="absolute top-10 left-0 w-32 md:w-48 lg:w-64 animate-float opacity-90">
+          {/* 1. Mariposas Animadas - Múltiples instancias flotando por la pantalla */}
+          {/* Mariposa 1 - Superior izquierda */}
+          <div className="absolute top-10 left-0 w-24 md:w-32 lg:w-40 animate-float opacity-100">
             <img 
               src="/img/mariposas.png" 
               alt="Mariposas" 
-              // Corrección: Se completó 'h-' a 'h-auto' para asegurar la proporción
               className="w-full h-auto object-contain"
+              style={{ animationDelay: '0s', animationDuration: '8s' }}
+            />
+          </div>
+
+          {/* Mariposa 2 - Superior derecha */}
+          <div className="absolute top-20 right-10 w-20 md:w-28 lg:w-36 animate-float opacity-95">
+            <img 
+              src="/img/mariposas.png" 
+              alt="Mariposas" 
+              className="w-full h-auto object-contain transform scale-x-[-1]"
+              style={{ animationDelay: '2s', animationDuration: '10s' }}
+            />
+          </div>
+
+          {/* Mariposa 3 - Centro superior */}
+          <div className="absolute top-32 left-1/4 w-16 md:w-24 lg:w-32 animate-float opacity-90">
+            <img 
+              src="/img/mariposas.png" 
+              alt="Mariposas" 
+              className="w-full h-auto object-contain"
+              style={{ animationDelay: '4s', animationDuration: '12s' }}
+            />
+          </div>
+
+          {/* Mariposa 4 - Medio izquierda */}
+          <div className="absolute top-1/3 left-16 w-20 md:w-28 lg:w-36 animate-float opacity-100">
+            <img 
+              src="/img/mariposas.png" 
+              alt="Mariposas" 
+              className="w-full h-auto object-contain transform scale-x-[-1]"
+              style={{ animationDelay: '1s', animationDuration: '9s' }}
+            />
+          </div>
+
+          {/* Mariposa 5 - Medio derecha */}
+          <div className="absolute top-1/2 right-20 w-18 md:w-26 lg:w-34 animate-float opacity-95">
+            <img 
+              src="/img/mariposas.png" 
+              alt="Mariposas" 
+              className="w-full h-auto object-contain"
+              style={{ animationDelay: '3s', animationDuration: '11s' }}
+            />
+          </div>
+
+          {/* Mariposa 6 - Centro */}
+          <div className="absolute top-2/3 left-1/2 w-22 md:w-30 lg:w-38 animate-float opacity-100">
+            <img 
+              src="/img/mariposas.png" 
+              alt="Mariposas" 
+              className="w-full h-auto object-contain transform scale-x-[-1]"
+              style={{ animationDelay: '5s', animationDuration: '7s' }}
+            />
+          </div>
+
+          {/* Mariposa 7 - Inferior izquierda */}
+          <div className="absolute bottom-1/4 left-32 w-24 md:w-32 lg:w-40 animate-float opacity-95">
+            <img 
+              src="/img/mariposas.png" 
+              alt="Mariposas" 
+              className="w-full h-auto object-contain"
+              style={{ animationDelay: '6s', animationDuration: '9s' }}
+            />
+          </div>
+
+          {/* Mariposa 8 - Inferior centro */}
+          <div className="absolute bottom-32 left-2/3 w-20 md:w-28 lg:w-36 animate-float opacity-90">
+            <img 
+              src="/img/mariposas.png" 
+              alt="Mariposas" 
+              className="w-full h-auto object-contain transform scale-x-[-1]"
+              style={{ animationDelay: '3.5s', animationDuration: '10.5s' }}
             />
           </div>
 
