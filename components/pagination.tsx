@@ -64,17 +64,17 @@ export default function Pagination({
         
         {/* Contador de resultados - Estilo sutil */}
         <div className="flex items-center gap-2">
-          <span className="text-gray-500">Mostrando</span>
+          <span className="text-white">Mostrando</span>
           <span className="font-semibold text-[#003594]">{startItem}-{endItem}</span>
-          <span className="text-gray-500">de</span>
+          <span className="text-white">de</span>
           <span className="font-semibold text-[#003594]">{totalItems}</span>
-          <span className="text-gray-500">resultados</span>
+          <span className="text-white">resultados</span>
         </div>
         
         {/* Selector de items por página - Más compacto */}
         {onItemsPerPageChange && (
           <div className="flex items-center gap-2">
-            <span className="text-gray-500">Por página:</span>
+            <span className="text-white">Por página:</span>
             <select
               value={itemsPerPage}
               onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
@@ -97,7 +97,7 @@ export default function Pagination({
           disabled={currentPage === 1}
           className={`p-1.5 rounded text-xs transition-all ${
             currentPage === 1
-              ? 'text-gray-300 cursor-not-allowed'
+              ? 'text-white cursor-not-allowed'
               : 'text-gray-600 hover:text-[#003594] hover:bg-gray-100'
           }`}
           title="Primera página"
@@ -111,8 +111,8 @@ export default function Pagination({
           disabled={currentPage === 1}
           className={`px-2 py-1 rounded text-xs transition-all ${
             currentPage === 1
-              ? 'text-gray-300 cursor-not-allowed'
-              : 'text-gray-600 hover:text-[#003594] hover:bg-gray-100'
+              ? 'text-white cursor-not-allowed'
+              : 'text-white hover:text-[#003594] hover:bg-gray-100'
           }`}
         >
           ‹ Anterior
@@ -122,17 +122,17 @@ export default function Pagination({
         <div className="flex items-center gap-1 mx-2">
           {pageNumbers.map((page, index) => (
             page === '...' ? (
-              <span key={`ellipsis-${index}`} className="px-2 text-gray-400 text-xs">
+              <span key={`ellipsis-${index}`} className="px-2 text-white text-xs">
                 ···
               </span>
             ) : (
               <button
                 key={page}
                 onClick={() => onPageChange(page as number)}
-                className={`min-w-[28px] h-7 px-2 rounded text-xs font-medium transition-all ${
+                className={`min-w-[28px] h-10 px-7 rounded text-xs font-medium transition-all ${
                   currentPage === page
                     ? 'bg-[#003594] text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-[#003594]'
+                    : 'text-white hover:bg-gray-100 hover:text-[#003594]'
                 }`}
               >
                 {page}
@@ -145,10 +145,10 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`px-2 py-1 rounded text-xs transition-all ${
+          className={`px-6 py-1 rounded text-xs transition-all ${
             currentPage === totalPages
-              ? 'text-gray-300 cursor-not-allowed'
-              : 'text-gray-600 hover:text-[#003594] hover:bg-gray-100'
+              ? 'text-white cursor-not-allowed'
+              : 'text-white hover:text-[#003594] hover:bg-gray-100'
           }`}
         >
           Siguiente ›
@@ -160,8 +160,8 @@ export default function Pagination({
           disabled={currentPage === totalPages}
           className={`p-1.5 rounded text-xs transition-all ${
             currentPage === totalPages
-              ? 'text-gray-300 cursor-not-allowed'
-              : 'text-gray-600 hover:text-[#003594] hover:bg-gray-100'
+              ? 'text-white cursor-not-allowed'
+              : 'text-white hover:text-[#003594] hover:bg-gray-100'
           }`}
           title="Última página"
         >
