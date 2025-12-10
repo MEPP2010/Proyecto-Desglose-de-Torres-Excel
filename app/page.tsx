@@ -6,6 +6,7 @@ import Link from 'next/link';
 import PlanoViewer, { usePlanoViewer } from '@/components/PlanoViewer';
 import UploadExcelModal from '@/components/UploadExcelModal';
 import Pagination from '@/components/pagination';
+import TableHeaderPremium from '@/components/TableHeaderPremium';
 import indicePlanos from '@/public/indice-planos.json';
 
 interface Piece {
@@ -163,8 +164,7 @@ export default function BuscadorPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    // Scroll suave hacia la tabla
-    document.querySelector('.glass-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Scroll deshabilitado - el usuario mantiene su posición actual
   };
 
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
@@ -250,19 +250,13 @@ export default function BuscadorPage() {
         <div className="glass-card rounded-2xl overflow-hidden border border-white/50">
           <div className="overflow-x-auto max-h-[60vh] custom-scrollbar">
             <table className="min-w-full divide-y divide-gray-200/50">
-              <thead className="bg-[#003594]/90 backdrop-blur-sm sticky top-0 z-10 text-white shadow-md">
-                <tr>
-                  {[
-                    'Material', 'Texto Breve', 'Tipo', 'Fabricante', 'Cabeza', 
-                    'Parte', 'Cuerpo', 'Tramo', 'Pos.', 'Descripción', 
-                    'Long 2', 'Cant.', 'Peso U.', 'Plano', 'Acción'
-                  ].map(header => (
-                    <th key={header} className="px-4 py-4 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap border-r border-white/10 last:border-none">
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+                <TableHeaderPremium
+                columns={[
+                  'Material', 'Texto Breve', 'Tipo', 'Fabricante', 'Cabeza',
+                  'Parte', 'Cuerpo', 'Tramo', 'Pos.', 'Descripción',
+                  'Long 2', 'Cant.', 'Peso U.', 'Plano', 'Acción'
+                ]}
+              />
               <tbody className="divide-y divide-gray-200/40">
                 {currentResults.length === 0 ? (
                   <tr>

@@ -23,19 +23,19 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(115, 115, 115, 0.05);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(115, 115, 115, 0.3);
   border-radius: 10px;
   backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(115, 115, 115, 0.2);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(115, 115, 115, 0.3);
 }
 
 /* Utilidades generales */
@@ -47,7 +47,7 @@ select, input {
 
 /* Contenedor Principal de Cristal */
 .glass-container {
-  background: rgba(255, 255, 255, 0.75); /* Más transparente para ver el fondo */
+  background: rgba(255, 255, 255, 0.5); /* Más transparente para ver el fondo */
   backdrop-filter: blur(20px); /* Blur intenso para legibilidad */
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.6); /* Borde brillante */
@@ -56,7 +56,7 @@ select, input {
 
 /* Tarjetas internas (filtros, items) con efecto "flotante" */
 .glass-card {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.4);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
@@ -64,7 +64,7 @@ select, input {
 }
 
 .glass-card:hover {
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.45);
   transform: translateY(-2px);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
   border-color: rgba(255, 255, 255, 0.8);
@@ -194,4 +194,18 @@ select, input {
 
 .animate-float-circular {
   animation: floatCircular 10s ease-in-out infinite;
+}
+
+/* Animación shimmer para efectos de brillo en headers */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s infinite ease-in-out;
 }

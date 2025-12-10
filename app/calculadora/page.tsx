@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import PlanoViewer, { usePlanoViewer } from '@/components/PlanoViewer';
 import Pagination from '@/components/pagination';
 import indicePlanos from '@/public/indice-planos.json';
+import TableHeaderPremium from '@/components/TableHeaderPremium';
 
 // --- Interfaces ---
 
@@ -281,8 +282,7 @@ export default function CalculadoraPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    // Scroll suave hacia la tabla
-    document.querySelector('.glass-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Scroll deshabilitado - el usuario mantiene su posición actual
   };
 
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
@@ -385,13 +385,9 @@ export default function CalculadoraPage() {
             <div className="glass-card overflow-hidden rounded-2xl border border-white/50 shadow-xl">
               <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
                 <table className="w-full text-sm">
-                  <thead className="bg-[#003594] text-white sticky top-0 z-10 shadow-md">
-                    <tr>
-                      {['Material', 'Texto Breve', 'Descripción', 'Parte', 'Pos.', 'Cant. Orig.', 'Cant. Calc.', 'Peso U.', 'Peso Total', 'Long 2', 'Plano'].map(h => (
-                        <th key={h} className="px-4 py-4 text-left font-semibold whitespace-nowrap border-r border-blue-800 last:border-none">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
+                  <TableHeaderPremium
+                    columns={['Material', 'Texto Breve', 'Descripción', 'Parte', 'Pos.', 'Cant. Orig.', 'Cant. Calc.', 'Peso U.', 'Peso Total', 'Long 2', 'Plano']}
+                  />
                   <tbody className="divide-y divide-gray-100/30">
                     {currentResults.map((piece, idx) => (
                       <tr key={idx} className="hover:bg-blue-50/50 transition duration-150 bg-white/30 odd:bg-white/10">

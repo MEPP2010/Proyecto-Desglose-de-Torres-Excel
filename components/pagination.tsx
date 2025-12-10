@@ -27,30 +27,25 @@ export default function Pagination({
   // Generar array de páginas a mostrar
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
-    const maxPagesToShow = 7; // Número máximo de botones de página a mostrar
+    const maxPagesToShow = 5; // Reducido para diseño más compacto
 
     if (totalPages <= maxPagesToShow) {
-      // Mostrar todas las páginas si son pocas
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
     } else {
-      // Lógica para mostrar páginas con ellipsis
-      if (currentPage <= 3) {
-        // Cerca del inicio
-        for (let i = 1; i <= 5; i++) pages.push(i);
+      if (currentPage <= 2) {
+        for (let i = 1; i <= 3; i++) pages.push(i);
         pages.push('...');
         pages.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        // Cerca del final
+      } else if (currentPage >= totalPages - 1) {
         pages.push(1);
         pages.push('...');
-        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+        for (let i = totalPages - 2; i <= totalPages; i++) pages.push(i);
       } else {
-        // En el medio
         pages.push(1);
         pages.push('...');
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+        pages.push(currentPage);
         pages.push('...');
         pages.push(totalPages);
       }
@@ -62,24 +57,28 @@ export default function Pagination({
   const pageNumbers = getPageNumbers();
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-4 bg-white/40 backdrop-blur-sm rounded-xl border border-white/50">
+    <div className="w-full space-y-3">
       
-      {/* Información de items mostrados */}
-      <div className="flex items-center gap-4 text-sm text-gray-700 font-medium">
-        <span>
-          Mostrando <span className="font-bold text-[#003594]">{startItem}</span> - 
-          <span className="font-bold text-[#003594]"> {endItem}</span> de 
-          <span className="font-bold text-[#003594]"> {totalItems}</span> resultados
-        </span>
+      {/* Barra superior: Información de resultados */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-3 py-2 text-xs text-gray-600">
         
-        {/* Selector de items por página */}
+        {/* Contador de resultados - Estilo sutil */}
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500">Mostrando</span>
+          <span className="font-semibold text-[#003594]">{startItem}-{endItem}</span>
+          <span className="text-gray-500">de</span>
+          <span className="font-semibold text-[#003594]">{totalItems}</span>
+          <span className="text-gray-500">resultados</span>
+        </div>
+        
+        {/* Selector de items por página - Más compacto */}
         {onItemsPerPageChange && (
           <div className="flex items-center gap-2">
-            <span className="text-gray-600">Items por página:</span>
+            <span className="text-gray-500">Por página:</span>
             <select
               value={itemsPerPage}
               onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-              className="glass-input px-3 py-1.5 rounded-lg text-sm font-semibold text-[#003594] border border-gray-200 cursor-pointer"
+              className="px-2 py-1 text-xs rounded border border-gray-300 bg-white text-gray-700 cursor-pointer hover:border-[#003594] focus:outline-none focus:border-[#003594] focus:ring-1 focus:ring-[#003594] transition-colors"
             >
               {itemsPerPageOptions.map(option => (
                 <option key={option} value={option}>{option}</option>
@@ -89,51 +88,51 @@ export default function Pagination({
         )}
       </div>
 
-      {/* Controles de paginación */}
-      <div className="flex items-center gap-2">
+      {/* Barra inferior: Controles de navegación - Diseño minimalista */}
+      <div className="flex items-center justify-center gap-1">
         
-        {/* Botón Primera Página */}
+        {/* Botón Primera Página - Más pequeño */}
         <button
           onClick={() => onPageChange(1)}
           disabled={currentPage === 1}
-          className={`px-3 py-2 rounded-lg font-bold transition-all duration-200 ${
+          className={`p-1.5 rounded text-xs transition-all ${
             currentPage === 1
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-white/80 text-[#003594] hover:bg-[#003594] hover:text-white border border-gray-200 hover:border-[#003594] shadow-sm'
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-gray-600 hover:text-[#003594] hover:bg-gray-100'
           }`}
           title="Primera página"
         >
-          ⏮️
+          ⟪
         </button>
 
-        {/* Botón Anterior */}
+        {/* Botón Anterior - Compacto */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`px-4 py-2 rounded-lg font-bold transition-all duration-200 ${
+          className={`px-2 py-1 rounded text-xs transition-all ${
             currentPage === 1
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-white/80 text-[#003594] hover:bg-[#003594] hover:text-white border border-gray-200 hover:border-[#003594] shadow-sm'
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-gray-600 hover:text-[#003594] hover:bg-gray-100'
           }`}
         >
-          ◀ Anterior
+          ‹ Anterior
         </button>
 
-        {/* Números de página */}
-        <div className="hidden sm:flex items-center gap-1">
+        {/* Números de página - Diseño minimalista */}
+        <div className="flex items-center gap-1 mx-2">
           {pageNumbers.map((page, index) => (
             page === '...' ? (
-              <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-400 font-bold">
-                ...
+              <span key={`ellipsis-${index}`} className="px-2 text-gray-400 text-xs">
+                ···
               </span>
             ) : (
               <button
                 key={page}
                 onClick={() => onPageChange(page as number)}
-                className={`px-4 py-2 rounded-lg font-bold transition-all duration-200 ${
+                className={`min-w-[28px] h-7 px-2 rounded text-xs font-medium transition-all ${
                   currentPage === page
-                    ? 'bg-[#003594] text-white shadow-lg scale-110 border-2 border-[#003594]'
-                    : 'bg-white/80 text-[#003594] hover:bg-[#003594] hover:text-white border border-gray-200 hover:border-[#003594] shadow-sm hover:scale-105'
+                    ? 'bg-[#003594] text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-[#003594]'
                 }`}
               >
                 {page}
@@ -142,36 +141,31 @@ export default function Pagination({
           ))}
         </div>
 
-        {/* Indicador de página actual en móvil */}
-        <div className="sm:hidden px-4 py-2 bg-[#003594] text-white font-bold rounded-lg shadow-lg">
-          {currentPage} / {totalPages}
-        </div>
-
-        {/* Botón Siguiente */}
+        {/* Botón Siguiente - Compacto */}
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`px-4 py-2 rounded-lg font-bold transition-all duration-200 ${
+          className={`px-2 py-1 rounded text-xs transition-all ${
             currentPage === totalPages
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-white/80 text-[#003594] hover:bg-[#003594] hover:text-white border border-gray-200 hover:border-[#003594] shadow-sm'
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-gray-600 hover:text-[#003594] hover:bg-gray-100'
           }`}
         >
-          Siguiente ▶
+          Siguiente ›
         </button>
 
-        {/* Botón Última Página */}
+        {/* Botón Última Página - Más pequeño */}
         <button
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages}
-          className={`px-3 py-2 rounded-lg font-bold transition-all duration-200 ${
+          className={`p-1.5 rounded text-xs transition-all ${
             currentPage === totalPages
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-white/80 text-[#003594] hover:bg-[#003594] hover:text-white border border-gray-200 hover:border-[#003594] shadow-sm'
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-gray-600 hover:text-[#003594] hover:bg-gray-100'
           }`}
           title="Última página"
         >
-          ⏭️
+          ⟫
         </button>
       </div>
     </div>
