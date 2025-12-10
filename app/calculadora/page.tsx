@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import PlanoViewer, { usePlanoViewer } from '@/components/PlanoViewer';
+import Pagination from '@/components/pagination';
 import indicePlanos from '@/public/indice-planos.json';
 
 // --- Interfaces ---
@@ -60,6 +61,10 @@ export default function CalculadoraPage() {
   const [message, setMessage] = useState('');
   const [partsMessage, setPartsMessage] = useState('Selecciona TIPO y FABRICANTE para ver las partes disponibles...');
 
+  // Estados de paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+
   // Hook para el visualizador de planos
   const { isOpen, planoUrl, planoName, openViewer, closeViewer } = usePlanoViewer();
 
@@ -77,6 +82,11 @@ export default function CalculadoraPage() {
       setPartsMessage('');
     }
   }, [filters.tipo, filters.fabricante, options.PARTE_DIVISION]);
+
+  // Resetear a página 1 cuando cambien los resultados
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [results.length, itemsPerPage]);
 
   const loadOptions = async () => {
     try {
@@ -210,7 +220,6 @@ export default function CalculadoraPage() {
       showModal('⚠️ No hay datos para exportar');
       return;
     }
-    // (Código de exportación se mantiene igual por brevedad, pero funciona en contexto)
     let html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head><meta charset="utf-8"></head>
@@ -263,6 +272,23 @@ export default function CalculadoraPage() {
     alert(`⚠️ No se encontró el plano "${plano}.jpg"`);
   }
   }; 
+
+  // Calcular datos paginados
+  const totalPages = Math.ceil(results.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentResults = results.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // Scroll suave hacia la tabla
+    document.querySelector('.glass-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="min-h-screen p-4 sm:p-8 flex flex-col items-center relative z-10 w-full">
@@ -367,7 +393,7 @@ export default function CalculadoraPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100/30">
-                    {results.map((piece, idx) => (
+                    {currentResults.map((piece, idx) => (
                       <tr key={idx} className="hover:bg-blue-50/50 transition duration-150 bg-white/30 odd:bg-white/10">
                         <td className="px-4 py-3 text-[#003594] font-bold">{piece.id_item || '-'}</td>
                         <td className="px-4 py-3 text-gray-800">{piece.texto_breve || '-'}</td>
@@ -401,6 +427,21 @@ export default function CalculadoraPage() {
                 </table>
               </div>
             </div>
+
+            {/* Paginación */}
+            {results.length > 0 && (
+              <div className="mt-6">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={results.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={handlePageChange}
+                  itemsPerPageOptions={[10, 25, 50, 100, 200]}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                />
+              </div>
+            )}
 
             <div className="mt-8 p-6 bg-green-50/80 backdrop-blur-md border border-green-200 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 shadow-lg">
               <div className="flex items-center gap-3 text-green-900">

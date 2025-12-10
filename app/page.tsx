@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import PlanoViewer, { usePlanoViewer } from '@/components/PlanoViewer';
 import UploadExcelModal from '@/components/UploadExcelModal';
+import Pagination from '@/components/pagination';
 import indicePlanos from '@/public/indice-planos.json';
 
 interface Piece {
@@ -58,12 +59,21 @@ export default function BuscadorPage() {
   const [message, setMessage] = useState('Seleccione filtros para buscar');
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
+  // Estados de paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+
   // Hook para el visualizador de planos
   const { isOpen, planoUrl, planoName, openViewer, closeViewer } = usePlanoViewer();
 
   useEffect(() => {
     loadOptions();
   }, [filters.tipo, filters.fabricante, filters.cabeza, filters.cuerpo, filters.tramo]);
+
+  // Resetear a página 1 cuando cambien los resultados
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [results.length, itemsPerPage]);
 
   const loadOptions = async () => {
     try {
@@ -145,11 +155,27 @@ export default function BuscadorPage() {
     window.location.reload();
   };
 
+  // Calcular datos paginados
+  const totalPages = Math.ceil(results.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentResults = results.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // Scroll suave hacia la tabla
+    document.querySelector('.glass-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="p-4 sm:p-8 min-h-screen flex flex-col items-center w-full">
       
       {/* --- CONTENEDOR PRINCIPAL LIQUID GLASS --- */}
-      {/* Se usa animate-slide-up para entrada suave y glass-container para el efecto visual */}
       <div className="w-full max-w-7xl glass-container rounded-3xl p-6 sm:p-10 mt-4 mb-20 relative z-20 animate-slide-up">
         
         {/* Header con título y botones */}
@@ -238,14 +264,14 @@ export default function BuscadorPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200/40">
-                {results.length === 0 ? (
+                {currentResults.length === 0 ? (
                   <tr>
                     <td colSpan={15} className="px-6 py-12 text-center text-gray-500 font-medium italic bg-white/40">
                       No hay resultados para mostrar. Ajusta los filtros arriba.
                     </td>
                   </tr>
                 ) : (
-                  results.map((piece, idx) => (
+                  currentResults.map((piece, idx) => (
                     <tr key={idx} className="hover:bg-blue-50/60 transition duration-150 group bg-white/20 odd:bg-white/10">
                       <td className="px-4 py-3 text-sm font-bold text-[#003594]">{piece.id_item || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-800">{piece.texto_breve || '-'}</td>
@@ -282,6 +308,21 @@ export default function BuscadorPage() {
             </table>
           </div>
         </div>
+
+        {/* Paginación */}
+        {results.length > 0 && (
+          <div className="mt-6">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={results.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={handlePageChange}
+              itemsPerPageOptions={[10, 25, 50, 100, 200]}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
+          </div>
+        )}
       </div>
 
       {/* Modal de Upload */}
