@@ -299,8 +299,11 @@ export default function CalculadoraPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-gray-200/50 pb-6 gap-6">
           <div>
-            <h1 className="text-4xl font-extrabold text-[#003594] mb-2 drop-shadow-sm">
-              🔧 Calculadora de Materiales
+            <h1 className="text-4xl font-extrabold mb-6 flex items-center gap-2">
+              <span className="text-4xl">🔧</span> 
+              <span className= "bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] bg-clip-text text-transparent tracking-tight drop-shadow-sm">
+              Calculadora de Materiales
+              </span>
             </h1>
             <p className="text-gray-700 font-medium text-lg">
               Selecciona las partes de la torre y calcula los materiales.
@@ -308,7 +311,7 @@ export default function CalculadoraPage() {
           </div>
           <a 
             href="/" 
-            className="flex items-center gap-2 text-[#003594] hover:text-[#ff6600] font-bold transition-all bg-white/50 hover:bg-white/80 px-6 py-3 rounded-xl shadow-sm border border-white/60"
+            className="flex items-center gap-2 bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] bg-clip-text text-transparent tracking-tight drop-shadow-sm hover:text-[#ff6600] font-bold transition-all bg-white/50 hover:bg-white/80 px-6 py-3 rounded-xl shadow-sm border border-white/60"
           >
             <span>←</span> Volver al Buscador
           </a>
@@ -316,8 +319,11 @@ export default function CalculadoraPage() {
 
         {/* Panel de Configuración (Tarjeta interna) */}
         <div className="glass-card p-8 rounded-2xl mb-8">
-          <div className="text-xl font-bold text-[#003594] mb-6 flex items-center gap-2">
-            📋 Configuración de Torre
+          <div className="text-xl font-bold mb-6 flex items-center gap-2">
+            <span className="text-xl">📋</span>
+            <span className="bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] bg-clip-text text-transparent tracking-tight drop-shadow-sm">
+              Configuración de Torre
+            </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -328,8 +334,11 @@ export default function CalculadoraPage() {
           </div>
 
           <div className="border-t border-gray-200/40 pt-8 mt-6">
-            <div className="text-xl font-bold text-[#003594] mb-6 flex items-center gap-2">
-              🗝️ Selección de Partes
+            <div className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span className="text-xl">🗝️</span>
+              <span className="bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] bg-clip-text text-transparent tracking-tight drop-shadow-sm">
+               Selección de Partes
+              </span>
             </div>
 
             {partsMessage ? (
@@ -352,7 +361,7 @@ export default function CalculadoraPage() {
           <div className="flex justify-center gap-6 mt-10 flex-wrap">
             <button 
               onClick={handleCalculate} 
-              className="btn-shine bg-[#003594] hover:bg-[#002a75] text-white text-lg px-10 py-4 rounded-full font-bold shadow-lg hover:shadow-blue-900/30 transition-all duration-300 flex items-center gap-3 transform hover:-translate-y-1"
+              className="btn-shine bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e]  text-white text-lg px-10 py-4 rounded-full font-bold shadow-lg hover:shadow-blue-900/30 transition-all duration-300 flex items-center gap-3 transform hover:-translate-y-1"
             >
               <span>🧮</span> Calcular Materiales
             </button>
@@ -477,11 +486,11 @@ function FilterSelect({ label, value, options, onChange }: {
 }) {
   return (
     <div className="flex flex-col group">
-      <label className="block font-bold text-[#003594] text-xs uppercase tracking-wide mb-2 group-hover:text-[#ff6600] transition-colors">{label}</label>
+      <label className="mb-2 text-xs font-bold bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] bg-clip-text text-transparent tracking-wider uppercase group-hover:text-[#ff6600] transition-colors">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="glass-input w-full p-3 rounded-xl focus:ring-[#003594] text-gray-700 text-sm font-medium outline-none cursor-pointer"
+        className="glass-input p-3 w-full rounded-xl text-sm font-medium text-gray-700 outline-none cursor-pointer"
       >
         <option value="">Seleccionar...</option>
         {options.map(opt => (

@@ -181,7 +181,7 @@ export default function BuscadorPage() {
         {/* Header con título y botones */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 border-b border-gray-200/50 pb-6 gap-6">
           <div>
-            <h1 className="text-4xl sm:text-5xl font-extrabold text-[#003594] tracking-tight drop-shadow-sm">
+            <h1 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] bg-clip-text text-transparent tracking-tight drop-shadow-sm">
               Buscador de Materiales
             </h1>
             <p className="text-gray-600 font-medium mt-2 text-lg">Sistema inteligente de gestión de torres de transmisión</p>
@@ -223,7 +223,7 @@ export default function BuscadorPage() {
              <button
               type="submit"
               disabled={loading}
-              className="btn-shine w-full md:w-1/3 py-4 px-8 bg-[#003594] hover:bg-[#002a75] text-white font-bold rounded-xl transition duration-300 shadow-lg hover:shadow-blue-900/40 disabled:opacity-50 flex justify-center items-center gap-3 text-lg"
+              className="btn-shine w-full md:w-1/3 py-4 px-8 bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] text-white font-bold rounded-xl transition duration-300 shadow-lg hover:shadow-blue-900/40 disabled:opacity-50 flex justify-center items-center gap-3 text-lg"
             >
               {loading ? (
                 <>
@@ -346,11 +346,11 @@ function FilterSelect({ label, value, options, onChange }: {
 }) {
   return (
     <div className="flex flex-col group">
-      <label className="mb-2 text-xs font-bold text-[#003594] uppercase tracking-wider group-hover:text-[#ff6600] transition-colors">{label}</label>
+      <label className="mb-2 text-xs font-bold bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] bg-clip-text text-transparent tracking-tight uppercase group-hover:text-[#ff6600] transition-colors">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="glass-input p-3 w-full rounded-xl text-sm font-medium text-gray-700 outline-none cursor-pointer"
+        className="glass-input p-3 w-full rounded-xl text-sm font-small text-gray-700 outline-none cursor-pointer"
       >
         <option value="">Todos</option>
         {options.map(opt => (
