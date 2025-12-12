@@ -69,7 +69,7 @@ export default function BuscadorPage() {
 
   useEffect(() => {
     loadOptions();
-  }, [filters.tipo, filters.fabricante, filters.cabeza, filters.cuerpo, filters.tramo]);
+  }, [filters.tipo, filters.fabricante, filters.cabeza, filters.parte, filters.cuerpo, filters.tramo]);
 
   // Resetear a página 1 cuando cambien los resultados
   useEffect(() => {
@@ -82,6 +82,7 @@ export default function BuscadorPage() {
       if (filters.tipo) params.append('TIPO', filters.tipo);
       if (filters.fabricante) params.append('FABRICANTE', filters.fabricante);
       if (filters.cabeza) params.append('CABEZA', filters.cabeza);
+      if (filters.parte) params.append('PARTE_DIVISION', filters.parte);
       if (filters.cuerpo) params.append('CUERPO', filters.cuerpo);
       if (filters.tramo) params.append('TRAMO', filters.tramo);
 
@@ -96,18 +97,15 @@ export default function BuscadorPage() {
     }
   };
 
-  const handleFilterChange = (filterName: string, value: any) => {
-    let newFilters = { ...filters, [filterName]: value };
-
-    // Lógica de reseteo en cascada
-    if (filterName === 'tipo') {
-      newFilters = { ...newFilters, fabricante: '', cabeza: '', parte: '', cuerpo: '', tramo: '' };
-    }
-    else if (filterName === 'fabricante') {
-      newFilters = { ...newFilters, cabeza: '', parte: '', cuerpo: '', tramo: '' };
-    }
-    setFilters(newFilters); 
+  
+  const handleFilterChange = (filterName: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterName]: value
+    }));
   };
+
+
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();

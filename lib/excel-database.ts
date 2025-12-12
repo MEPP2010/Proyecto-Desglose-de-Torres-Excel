@@ -425,6 +425,7 @@ export function getOptions(filters: Record<string, string>): Record<string, stri
   if (filters.TIPO) filteredData = filteredData.filter(p => p.tipo === filters.TIPO);
   if (filters.FABRICANTE) filteredData = filteredData.filter(p => p.fabricante === filters.FABRICANTE);
   if (filters.CABEZA) filteredData = filteredData.filter(p => p.cabeza === filters.CABEZA);
+  if (filters.PARTE_DIVISION) filteredData = filteredData.filter(p => p.parte_division === filters.PARTE_DIVISION);
   if (filters.CUERPO) filteredData = filteredData.filter(p => p.cuerpo === filters.CUERPO);
   if (filters.TRAMO) filteredData = filteredData.filter(p => p.tramo === filters.TRAMO);
   
@@ -577,6 +578,7 @@ export async function getOptionsAsync(filters: Record<string, string>): Promise<
   if (filters.TIPO) filteredData = filteredData.filter(p => p.tipo === filters.TIPO);
   if (filters.FABRICANTE) filteredData = filteredData.filter(p => p.fabricante === filters.FABRICANTE);
   if (filters.CABEZA) filteredData = filteredData.filter(p => p.cabeza === filters.CABEZA);
+  if (filters.PARTE_DIVISION) filteredData = filteredData.filter(p => p.parte_division === filters.PARTE_DIVISION);
   if (filters.CUERPO) filteredData = filteredData.filter(p => p.cuerpo === filters.CUERPO);
   if (filters.TRAMO) filteredData = filteredData.filter(p => p.tramo === filters.TRAMO);
   

@@ -11,6 +11,7 @@ export async function GET(request: Request) {
       TIPO: searchParams.get('TIPO') || '',
       FABRICANTE: searchParams.get('FABRICANTE') || '',
       CABEZA: searchParams.get('CABEZA') || '',
+      PARTE_DIVISION: searchParams.get('PARTE_DIVISION') || '',
       CUERPO: searchParams.get('CUERPO') || '',
       TRAMO: searchParams.get('TRAMO') || ''
     };
