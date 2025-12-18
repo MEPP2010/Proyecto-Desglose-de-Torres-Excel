@@ -1,6 +1,7 @@
 import * as React from 'react'
 import type { Metadata } from 'next'
 import './globals.css'
+import { Providers } from './provider'
 
 export const metadata: Metadata = {
   title: 'Desglose de Torres - ISA Transelca',
@@ -12,14 +13,11 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
       <body className="relative min-h-screen w-full bg-[#003594]">
+        <Providers>
         
         {/* --- CAPA DE FONDO (Imágenes Decorativas) --- */}
         <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
@@ -135,9 +133,9 @@ export default function RootLayout({
 
         {/* --- CONTENIDO PRINCIPAL --- */}
         <main className="relative z-10 min-h-screen flex flex-col">
-          {children}
-        </main>
-        
+            {children}
+          </main>
+        </Providers>
       </body>
     </html>
   )

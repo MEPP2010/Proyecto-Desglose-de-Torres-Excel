@@ -1,7 +1,8 @@
-// components/UploadExcelModal.tsx
+// components/UploadExcelModal.tsx - VERSIÓN CON TANSTACK QUERY
 'use client';
 
 import { useState, useRef } from 'react';
+import { useUploadExcel } from '@/hooks/useApiQueries';
 
 interface UploadExcelModalProps {
   isOpen: boolean;
@@ -11,12 +12,10 @@ interface UploadExcelModalProps {
 
 export default function UploadExcelModal({ isOpen, onClose, onSuccess }: UploadExcelModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<{
-    type: 'idle' | 'success' | 'error';
-    message: string;
-  }>({ type: 'idle', message: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 🔥 TANSTACK QUERY: Mutation para upload
+  const uploadMutation = useUploadExcel();
 
   if (!isOpen) return null;
 
@@ -26,72 +25,37 @@ export default function UploadExcelModal({ isOpen, onClose, onSuccess }: UploadE
       // Validar extensión
       const fileName = file.name.toLowerCase();
       if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
-        setUploadStatus({
-          type: 'error',
-          message: 'Por favor selecciona un archivo Excel (.xlsx o .xls)'
-        });
+        alert('Por favor selecciona un archivo Excel (.xlsx o .xls)');
         setSelectedFile(null);
         return;
       }
       setSelectedFile(file);
-      setUploadStatus({ type: 'idle', message: '' });
+      uploadMutation.reset(); // Resetear estado de mutation
     }
   };
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setUploadStatus({
-        type: 'error',
-        message: 'Por favor selecciona un archivo primero'
-      });
+      alert('Por favor selecciona un archivo primero');
       return;
     }
 
-    setUploading(true);
-    setUploadStatus({ type: 'idle', message: '' });
-
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-
-      const response = await fetch('/api/upload-excel', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setUploadStatus({
-          type: 'success',
-          message: `✅ ${data.message}\n📊 Total de registros: ${data.stats.totalRecords}\n📁 Archivo: ${data.stats.fileName} (${data.stats.fileSize})`
-        });
-        
-        // Esperar 2 segundos para que el usuario vea el mensaje
+    // 🔥 Ejecutar mutation
+    uploadMutation.mutate(selectedFile, {
+      onSuccess: (data) => {
+        // Esperar 2 segundos para mostrar mensaje de éxito
         setTimeout(() => {
           onSuccess();
           handleClose();
         }, 2000);
-      } else {
-        setUploadStatus({
-          type: 'error',
-          message: `❌ ${data.message}`
-        });
-      }
-    } catch (error) {
-      setUploadStatus({
-        type: 'error',
-        message: `❌ Error de conexión: ${error instanceof Error ? error.message : 'Error desconocido'}`
-      });
-    } finally {
-      setUploading(false);
-    }
+      },
+    });
   };
 
   const handleClose = () => {
-    if (!uploading) {
+    if (!uploadMutation.isPending) {
       setSelectedFile(null);
-      setUploadStatus({ type: 'idle', message: '' });
+      uploadMutation.reset();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -105,7 +69,7 @@ export default function UploadExcelModal({ isOpen, onClose, onSuccess }: UploadE
         {/* Botón cerrar */}
         <button
           onClick={handleClose}
-          disabled={uploading}
+          disabled={uploadMutation.isPending}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl font-bold disabled:opacity-50"
         >
           ✕
@@ -129,13 +93,13 @@ export default function UploadExcelModal({ isOpen, onClose, onSuccess }: UploadE
               type="file"
               accept=".xlsx,.xls"
               onChange={handleFileSelect}
-              disabled={uploading}
+              disabled={uploadMutation.isPending}
               className="hidden"
               id="file-upload"
             />
             <label
               htmlFor="file-upload"
-              className={`cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`cursor-pointer ${uploadMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="text-6xl mb-4">📊</div>
               <div className="text-lg font-semibold text-gray-700 mb-2">
@@ -151,14 +115,32 @@ export default function UploadExcelModal({ isOpen, onClose, onSuccess }: UploadE
           </div>
         </div>
 
-        {/* Mensaje de estado */}
-        {uploadStatus.message && (
-          <div className={`mb-6 p-4 rounded-lg whitespace-pre-line ${
-            uploadStatus.type === 'success' 
-              ? 'bg-green-50 border border-green-200 text-green-800' 
-              : 'bg-red-50 border border-red-200 text-red-800'
-          }`}>
-            {uploadStatus.message}
+        {/* Mensaje de estado - TanStack Query */}
+        {uploadMutation.isError && (
+          <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800">
+            ❌ {uploadMutation.error.message}
+          </div>
+        )}
+
+        {uploadMutation.isSuccess && uploadMutation.data && (
+          <div className="mb-6 p-4 rounded-lg whitespace-pre-line bg-green-50 border border-green-200 text-green-800">
+            {uploadMutation.data.message}
+            {uploadMutation.data.stats && (
+              <div className="mt-2 text-sm">
+                <div>📊 Total de registros: {uploadMutation.data.stats.recordsCount || 'N/A'}</div>
+                <div>📁 Archivo: {uploadMutation.data.stats.fileName} ({uploadMutation.data.stats.fileSize})</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {uploadMutation.isPending && (
+          <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 flex items-center gap-3">
+            <svg className="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Subiendo archivo y actualizando caché...</span>
           </div>
         )}
 
@@ -171,7 +153,7 @@ export default function UploadExcelModal({ isOpen, onClose, onSuccess }: UploadE
               <ul className="text-sm text-yellow-700 space-y-1">
                 <li>• El nuevo archivo reemplazará completamente los datos existentes</li>
                 <li>• Asegúrate de que el archivo tenga el formato correcto</li>
-                <li>• La página se recargará automáticamente después de la actualización</li>
+                <li>• El caché se actualizará automáticamente con TanStack Query</li>
               </ul>
             </div>
           </div>
@@ -181,17 +163,17 @@ export default function UploadExcelModal({ isOpen, onClose, onSuccess }: UploadE
         <div className="flex gap-4 justify-end">
           <button
             onClick={handleClose}
-            disabled={uploading}
+            disabled={uploadMutation.isPending}
             className="px-6 py-2 rounded-lg font-semibold text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancelar
           </button>
           <button
             onClick={handleUpload}
-            disabled={!selectedFile || uploading}
+            disabled={!selectedFile || uploadMutation.isPending}
             className="px-6 py-2 rounded-lg font-semibold bg-[#003594] text-white hover:bg-[#002a75] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {uploading ? (
+            {uploadMutation.isPending ? (
               <>
                 <span className="animate-spin">⏳</span>
                 Actualizando...

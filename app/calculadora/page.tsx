@@ -1,3 +1,4 @@
+// app/calculadora/page-tanstack.tsx - VERSIÓN CON TANSTACK QUERY
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -5,6 +6,7 @@ import PlanoViewer, { usePlanoViewer } from '@/components/PlanoViewer';
 import Pagination from '@/components/pagination';
 import indicePlanos from '@/public/indice-planos.json';
 import TableHeaderPremium from '@/components/TableHeaderPremium';
+import { useOptions, useCalculateMaterials } from '@/hooks/useApiQueries';
 
 // --- Interfaces ---
 
@@ -23,14 +25,6 @@ interface CalculatedPiece {
   mod_plano: string;
 }
 
-interface FilterOptions {
-  TIPO: string[];
-  FABRICANTE: string[];
-  CABEZA: string[];
-  CUERPO: string[];
-  PARTE_DIVISION: string[];
-}
-
 interface SelectedPart {
   part: string;
   quantity: number;
@@ -47,19 +41,10 @@ export default function CalculadoraPage() {
     cuerpo: ''
   });
   
-  const [options, setOptions] = useState<FilterOptions>({
-    TIPO: [],
-    FABRICANTE: [],
-    CABEZA: [],
-    CUERPO: [],
-    PARTE_DIVISION: []
-  });
-  
   const [parts, setParts] = useState<Record<string, SelectedPart>>({});
   const [results, setResults] = useState<CalculatedPiece[]>([]);
   const [totals, setTotals] = useState({ total_pieces: 0, total_weight: 0 });
   const [showResults, setShowResults] = useState(false);
-  const [message, setMessage] = useState('');
   const [partsMessage, setPartsMessage] = useState('Selecciona TIPO y FABRICANTE para ver las partes disponibles...');
 
   // Estados de paginación
@@ -69,46 +54,33 @@ export default function CalculadoraPage() {
   // Hook para el visualizador de planos
   const { isOpen, planoUrl, planoName, openViewer, closeViewer } = usePlanoViewer();
 
-  useEffect(() => {
-    loadOptions();
-  }, [filters.tipo, filters.fabricante, filters.cabeza, filters.cuerpo]);
+  // 🔥 TANSTACK QUERY: Cargar opciones
+  const { 
+    data: options, 
+    isLoading: optionsLoading 
+  } = useOptions(filters);
 
+  // 🔥 TANSTACK QUERY: Mutation para calcular
+  const calculateMutation = useCalculateMaterials();
+
+  // Actualizar lista de partes cuando cambien las opciones
   useEffect(() => {
     if (!filters.tipo || !filters.fabricante) {
       setPartsMessage('Selecciona TIPO y FABRICANTE para ver las partes disponibles...');
       setParts({});
-    } else if (options.PARTE_DIVISION.length === 0) {
+    } else if (!options?.PARTE_DIVISION || options.PARTE_DIVISION.length === 0) {
       setPartsMessage('No hay partes disponibles para esta configuración. Revisa los filtros.');
+      setParts({});
     } else {
       setPartsMessage('');
+      updatePartsList(options.PARTE_DIVISION);
     }
-  }, [filters.tipo, filters.fabricante, options.PARTE_DIVISION]);
+  }, [filters.tipo, filters.fabricante, options?.PARTE_DIVISION]);
 
   // Resetear a página 1 cuando cambien los resultados
   useEffect(() => {
     setCurrentPage(1);
   }, [results.length, itemsPerPage]);
-
-  const loadOptions = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (filters.tipo) params.append('TIPO', filters.tipo);
-      if (filters.fabricante) params.append('FABRICANTE', filters.fabricante);
-      if (filters.cabeza) params.append('CABEZA', filters.cabeza);
-      if (filters.cuerpo) params.append('CUERPO', filters.cuerpo);
-
-      const response = await fetch(`/api/options?${params}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setOptions(data.options);
-          updatePartsList(data.options.PARTE_DIVISION);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading options:', error);
-    }
-  };
 
   const updatePartsList = (availableParts: string[]) => {
     if (availableParts && availableParts.length > 0) {
@@ -164,48 +136,38 @@ export default function CalculadoraPage() {
     const selectedParts = Object.values(parts).filter(p => p.selected);
     
     if (selectedParts.length === 0) {
-      showModal('⚠️ Por favor selecciona al menos una parte de la torre');
+      alert('⚠️ Por favor selecciona al menos una parte de la torre');
       return;
     }
     
     if (!filters.tipo || !filters.fabricante) {
-      showModal('⚠️ Por favor completa al menos TIPO Y FABRICANTE');
+      alert('⚠️ Por favor completa al menos TIPO Y FABRICANTE');
       return;
     }
     
     setShowResults(true);
-    setMessage('⏳ Calculando materiales...');
-    
-    try {
-      const response = await fetch('/api/calculate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filters: {
-            tipo: filters.tipo,
-            fabricante: filters.fabricante,
-            cabeza: filters.cabeza,
-            cuerpo: filters.cuerpo
-          },
-          parts: selectedParts.map(p => ({ part: p.part, quantity: p.quantity }))
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
+
+    // 🔥 Usar TanStack Query mutation
+    calculateMutation.mutate(
+      {
+        filters: {
+          tipo: filters.tipo,
+          fabricante: filters.fabricante,
+          cabeza: filters.cabeza,
+          cuerpo: filters.cuerpo
+        },
+        parts: selectedParts.map(p => ({ part: p.part, quantity: p.quantity }))
+      },
+      {
+        onSuccess: (data) => {
           setResults(data.results);
           setTotals(data.totals);
-          setMessage(`✅ ${data.results.length} piezas diferentes encontradas`);
-        } else {
-          setMessage(`❌ Error: ${data.message}`);
+        },
+        onError: (error) => {
+          alert(`❌ Error: ${error.message}`);
         }
-      } else {
-        throw new Error("API Error");
       }
-    } catch (error) {
-      setMessage(`🚨 Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    }
+    );
   };
 
   const handleReset = () => {
@@ -213,12 +175,11 @@ export default function CalculadoraPage() {
     setParts({});
     setResults([]);
     setShowResults(false);
-    setTimeout(() => loadOptions(), 0);
   };
 
   const exportToExcel = () => {
     if (results.length === 0) {
-      showModal('⚠️ No hay datos para exportar');
+      alert('⚠️ No hay datos para exportar');
       return;
     }
     let html = `
@@ -256,10 +217,6 @@ export default function CalculadoraPage() {
   URL.revokeObjectURL(url);
   };
 
-  const showModal = (msg: string) => {
-    alert(msg);
-  };
-
   const handleViewPlano = (plano: string, modPlano: string, itemId: string) => {
   if (!plano || plano === '-') {
     alert('⚠️ Este ítem no tiene un plano asociado');
@@ -282,12 +239,19 @@ export default function CalculadoraPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    // Scroll deshabilitado - el usuario mantiene su posición actual
   };
 
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1);
+  };
+
+  // Mensaje de estado
+  const getMessage = () => {
+    if (calculateMutation.isPending) return '⏳ Calculando materiales...';
+    if (calculateMutation.isError) return `❌ Error: ${calculateMutation.error.message}`;
+    if (calculateMutation.isSuccess && results.length > 0) return `✅ ${results.length} piezas diferentes encontradas`;
+    return '';
   };
 
   return (
@@ -326,140 +290,168 @@ export default function CalculadoraPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <FilterSelect label="TIPO" value={filters.tipo} options={options.TIPO} onChange={(v) => handleFilterChange('tipo', v)} />
-            <FilterSelect label="FABRICANTE" value={filters.fabricante} options={options.FABRICANTE} onChange={(v) => handleFilterChange('fabricante', v)} />
-            <FilterSelect label="CABEZA" value={filters.cabeza} options={options.CABEZA} onChange={(v) => handleFilterChange('cabeza', v)} />
-            <FilterSelect label="CUERPO" value={filters.cuerpo} options={options.CUERPO || []} onChange={(v) => handleFilterChange('cuerpo', v)} />
-          </div>
-
-          <div className="border-t border-gray-200/40 pt-8 mt-6">
-            <div className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span className="text-xl">🗝️</span>
-              <span className="bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] bg-clip-text text-transparent tracking-tight drop-shadow-sm">
-               Selección de Partes
-              </span>
+          {optionsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003594]"></div>
+              <span className="ml-4 text-gray-600">Cargando opciones...</span>
             </div>
-
-            {partsMessage ? (
-              <p className="text-center text-gray-600 font-medium italic p-10 bg-white/30 rounded-xl border border-dashed border-gray-300/50">{partsMessage}</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-                {Object.values(parts).map(part => (
-                  <PartCard
-                    key={part.part}
-                    part={part}
-                    onToggle={() => togglePart(part.part)}
-                    onQuantityChange={(q) => updateQuantity(part.part, q)}
-                  />
-                ))}
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <FilterSelect label="TIPO" value={filters.tipo} options={options?.TIPO || []} onChange={(v) => handleFilterChange('tipo', v)} />
+                <FilterSelect label="FABRICANTE" value={filters.fabricante} options={options?.FABRICANTE || []} onChange={(v) => handleFilterChange('fabricante', v)} />
+                <FilterSelect label="CABEZA" value={filters.cabeza} options={options?.CABEZA || []} onChange={(v) => handleFilterChange('cabeza', v)} />
+                <FilterSelect label="CUERPO" value={filters.cuerpo} options={options?.CUERPO || []} onChange={(v) => handleFilterChange('cuerpo', v)} />
               </div>
-            )}
-          </div>
 
-          {/* Botones de Acción */}
-          <div className="flex justify-center gap-6 mt-10 flex-wrap">
-            <button 
-              onClick={handleCalculate} 
-              className="btn-shine bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e]  text-white text-lg px-10 py-4 rounded-full font-bold shadow-lg hover:shadow-blue-900/30 transition-all duration-300 flex items-center gap-3 transform hover:-translate-y-1"
-            >
-              <span>🧮</span> Calcular Materiales
-            </button>
-            <button 
-              onClick={handleReset} 
-              className="bg-gray-500/80 hover:bg-gray-600 text-white px-8 py-4 rounded-full font-semibold transition-all duration-300 shadow-md backdrop-blur-sm"
-            >
-              🔄 Limpiar
-            </button>
-          </div>
+              <div className="border-t border-gray-200/40 pt-8 mt-6">
+                <div className="text-xl font-bold mb-6 flex items-center gap-2">
+                  <span className="text-xl">🗝️</span>
+                  <span className="bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] bg-clip-text text-transparent tracking-tight drop-shadow-sm">
+                   Selección de Partes
+                  </span>
+                </div>
+
+                {partsMessage ? (
+                  <p className="text-center text-gray-600 font-medium italic p-10 bg-white/30 rounded-xl border border-dashed border-gray-300/50">{partsMessage}</p>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                    {Object.values(parts).map(part => (
+                      <PartCard
+                        key={part.part}
+                        part={part}
+                        onToggle={() => togglePart(part.part)}
+                        onQuantityChange={(q) => updateQuantity(part.part, q)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Botones de Acción */}
+              <div className="flex justify-center gap-6 mt-10 flex-wrap">
+                <button 
+                  onClick={handleCalculate} 
+                  disabled={calculateMutation.isPending}
+                  className="btn-shine bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e]  text-white text-lg px-10 py-4 rounded-full font-bold shadow-lg hover:shadow-blue-900/30 transition-all duration-300 flex items-center gap-3 transform hover:-translate-y-1 disabled:opacity-50"
+                >
+                  {calculateMutation.isPending ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Calculando...
+                    </>
+                  ) : (
+                    <>
+                      <span>🧮</span> Calcular Materiales
+                    </>
+                  )}
+                </button>
+                <button 
+                  onClick={handleReset} 
+                  className="bg-gray-500/80 hover:bg-gray-600 text-white px-8 py-4 rounded-full font-semibold transition-all duration-300 shadow-md backdrop-blur-sm"
+                >
+                  🔄 Limpiar
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Resultados */}
-        {showResults && (
+        {showResults && getMessage() && (
           <div className="animate-slide-up">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-6 p-6 bg-blue-50/70 backdrop-blur-md rounded-2xl border border-blue-100 shadow-sm">
-              <div className="font-bold text-[#003594] text-xl mb-4 sm:mb-0 drop-shadow-sm">{message}</div>
-              <div className="flex gap-6">
-                <div className="flex flex-col items-center bg-white/80 px-6 py-3 rounded-xl shadow-sm border border-white/50">
-                  <span className="text-gray-500 text-xs uppercase tracking-wider font-bold">Total Piezas</span>
-                  <span className="font-extrabold text-[#ff6600] text-2xl">{Math.round(totals.total_pieces)}</span>
+              <div className="font-bold text-[#003594] text-xl mb-4 sm:mb-0 drop-shadow-sm">{getMessage()}</div>
+              {calculateMutation.isSuccess && (
+                <div className="flex gap-6">
+                  <div className="flex flex-col items-center bg-white/80 px-6 py-3 rounded-xl shadow-sm border border-white/50">
+                    <span className="text-gray-500 text-xs uppercase tracking-wider font-bold">Total Piezas</span>
+                    <span className="font-extrabold text-[#ff6600] text-2xl">{Math.round(totals.total_pieces)}</span>
+                  </div>
+                  <div className="flex flex-col items-center bg-white/80 px-6 py-3 rounded-xl shadow-sm border border-white/50">
+                    <span className="text-gray-500 text-xs uppercase tracking-wider font-bold">Peso Total (kg)</span>
+                    <span className="font-extrabold text-[#ff6600] text-2xl">{totals.total_weight.toFixed(2)}</span>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center bg-white/80 px-6 py-3 rounded-xl shadow-sm border border-white/50">
-                  <span className="text-gray-500 text-xs uppercase tracking-wider font-bold">Peso Total (kg)</span>
-                  <span className="font-extrabold text-[#ff6600] text-2xl">{totals.total_weight.toFixed(2)}</span>
-                </div>
-              </div>
+              )}
             </div>
 
-            <div className="glass-card overflow-hidden rounded-2xl border border-white/50 shadow-xl">
-              <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
-                <table className="w-full text-sm">
-                  <TableHeaderPremium
-                    columns={['Material', 'Texto Breve', 'Descripción', 'Parte', 'Pos.', 'Cant. Orig.', 'Cant. Calc.', 'Peso U.', 'Peso Total', 'Long 2', 'Plano']}
-                  />
-                  <tbody className="divide-y divide-gray-100/30">
-                    {currentResults.map((piece, idx) => (
-                      <tr key={idx} className="hover:bg-blue-50/50 transition duration-150 bg-white/30 odd:bg-white/10">
-                        <td className="px-4 py-3 text-[#003594] font-bold">{piece.id_item || '-'}</td>
-                        <td className="px-4 py-3 text-gray-800">{piece.texto_breve || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700 truncate max-w-[200px]" title={piece.descripcion}>{piece.descripcion || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{piece.parte_division || '-'}</td>
-                        <td className="px-4 py-3 text-gray-700">{piece.posicion || '-'}</td>
-                        <td className="px-4 py-3 text-gray-600 text-center font-medium">{piece.cantidad_original}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="bg-[#fff3e0] text-[#e65100] font-bold px-3 py-1 rounded-lg border border-[#ffcc80] shadow-sm">
-                            {piece.cantidad_calculada}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-700">{piece.peso_unitario.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-gray-900 font-bold">{piece.peso_total.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-gray-700">{piece.long_2_principal || '-'}</td>
-                        <td className="px-4 py-3">
-                          {piece.plano && piece.plano !== '-' ? (
-                            <button
-                              onClick={() => handleViewPlano(piece.plano, piece.mod_plano, piece.id_item)}
-                              className="bg-blue-100 hover:bg-blue-600 hover:text-white text-blue-800 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
-                            >
-                              VER
-                            </button>
-                          ) : (
-                            <span className="text-gray-400 text-xs">N/A</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {calculateMutation.isSuccess && results.length > 0 && (
+              <>
+                <div className="glass-card overflow-hidden rounded-2xl border border-white/50 shadow-xl">
+                  <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
+                    <table className="w-full text-sm">
+                      <TableHeaderPremium
+                        columns={['Material', 'Texto Breve', 'Descripción', 'Parte', 'Pos.', 'Cant. Orig.', 'Cant. Calc.', 'Peso U.', 'Peso Total', 'Long 2', 'Plano']}
+                      />
+                      <tbody className="divide-y divide-gray-100/30">
+                        {currentResults.map((piece, idx) => (
+                          <tr key={idx} className="hover:bg-blue-50/50 transition duration-150 bg-white/30 odd:bg-white/10">
+                            <td className="px-4 py-3 text-[#003594] font-bold">{piece.id_item || '-'}</td>
+                            <td className="px-4 py-3 text-gray-800">{piece.texto_breve || '-'}</td>
+                            <td className="px-4 py-3 text-gray-700 truncate max-w-[200px]" title={piece.descripcion}>{piece.descripcion || '-'}</td>
+                            <td className="px-4 py-3 text-gray-700">{piece.parte_division || '-'}</td>
+                            <td className="px-4 py-3 text-gray-700">{piece.posicion || '-'}</td>
+                            <td className="px-4 py-3 text-gray-600 text-center font-medium">{piece.cantidad_original}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="bg-[#fff3e0] text-[#e65100] font-bold px-3 py-1 rounded-lg border border-[#ffcc80] shadow-sm">
+                                {piece.cantidad_calculada}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{piece.peso_unitario.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-gray-900 font-bold">{piece.peso_total.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-gray-700">{piece.long_2_principal || '-'}</td>
+                            <td className="px-4 py-3">
+                              {piece.plano && piece.plano !== '-' ? (
+                                <button
+                                  onClick={() => handleViewPlano(piece.plano, piece.mod_plano, piece.id_item)}
+                                  className="bg-blue-100 hover:bg-blue-600 hover:text-white text-blue-800 px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
+                                >
+                                  VER
+                                </button>
+                              ) : (
+                                <span className="text-gray-400 text-xs">N/A</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
-            {/* Paginación */}
-            {results.length > 0 && (
-              <div className="mt-6">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalItems={results.length}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={handlePageChange}
-                  itemsPerPageOptions={[10, 25, 50, 100, 200]}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                />
-              </div>
+                {/* Paginación */}
+                {results.length > 0 && (
+                  <div className="mt-6">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalItems={results.length}
+                      itemsPerPage={itemsPerPage}
+                      onPageChange={handlePageChange}
+                      itemsPerPageOptions={[10, 25, 50, 100, 200]}
+                      onItemsPerPageChange={handleItemsPerPageChange}
+                    />
+                  </div>
+                )}
+
+                <div className="mt-8 p-6 bg-green-50/80 backdrop-blur-md border border-green-200 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 shadow-lg">
+                  <div className="flex items-center gap-3 text-green-900">
+                    <span className="text-2xl">💾</span>
+                    <span className="font-bold text-lg">¿Listo para usar estos datos? Descarga el reporte completo.</span>
+                  </div>
+                  <button 
+                    onClick={exportToExcel} 
+                    className="btn-shine bg-[#28a745] hover:bg-[#218838] text-white px-8 py-3 rounded-xl font-bold shadow-md transition-colors flex items-center gap-2 transform hover:scale-105"
+                  >
+                    <span>📥</span> Exportar a Excel
+                  </button>
+                </div>
+              </>
             )}
-
-            <div className="mt-8 p-6 bg-green-50/80 backdrop-blur-md border border-green-200 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4 shadow-lg">
-              <div className="flex items-center gap-3 text-green-900">
-                <span className="text-2xl">💾</span>
-                <span className="font-bold text-lg">¿Listo para usar estos datos? Descarga el reporte completo.</span>
-              </div>
-              <button 
-                onClick={exportToExcel} 
-                className="btn-shine bg-[#28a745] hover:bg-[#218838] text-white px-8 py-3 rounded-xl font-bold shadow-md transition-colors flex items-center gap-2 transform hover:scale-105"
-              >
-                <span>📥</span> Exportar a Excel
-              </button>
-            </div>
           </div>
         )}
       </div>

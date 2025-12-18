@@ -1,4 +1,4 @@
-// app/page.tsx
+// app/page.tsx - VERSIÓN CON TANSTACK QUERY
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,6 +8,7 @@ import UploadExcelModal from '@/components/UploadExcelModal';
 import Pagination from '@/components/pagination';
 import TableHeaderPremium from '@/components/TableHeaderPremium';
 import indicePlanos from '@/public/indice-planos.json';
+import { useOptions, useSearchPieces } from '@/hooks/useApiQueries';
 
 interface Piece {
   id_item: string;
@@ -27,15 +28,6 @@ interface Piece {
   mod_plano: string;
 }
 
-interface FilterOptions {
-  TIPO: string[];
-  FABRICANTE: string[];
-  CABEZA: string[];
-  CUERPO: string[];
-  PARTE_DIVISION: string[];
-  TRAMO: string[];
-}
-
 export default function BuscadorPage() {
   const [filters, setFilters] = useState({
     tipo: '',
@@ -46,19 +38,8 @@ export default function BuscadorPage() {
     tramo: ''
   });
   
-  const [options, setOptions] = useState<FilterOptions>({
-    TIPO: [],
-    FABRICANTE: [],
-    CABEZA: [],
-    CUERPO: [],
-    PARTE_DIVISION: [],
-    TRAMO: []
-  });
-  
-  const [results, setResults] = useState<Piece[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('Seleccione filtros para buscar');
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [searchEnabled, setSearchEnabled] = useState(false); // Control manual de búsqueda
 
   // Estados de paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -67,71 +48,37 @@ export default function BuscadorPage() {
   // Hook para el visualizador de planos
   const { isOpen, planoUrl, planoName, openViewer, closeViewer } = usePlanoViewer();
 
-  useEffect(() => {
-    loadOptions();
-  }, [filters.tipo, filters.fabricante, filters.cabeza, filters.parte, filters.cuerpo, filters.tramo]);
+  // 🔥 TANSTACK QUERY: Cargar opciones automáticamente
+  const { 
+    data: options, 
+    isLoading: optionsLoading,
+    error: optionsError 
+  } = useOptions(filters);
+
+  // 🔥 TANSTACK QUERY: Buscar piezas (solo cuando searchEnabled = true)
+  const {
+    data: results = [],
+    isLoading: searchLoading,
+    error: searchError,
+    isFetching: searchFetching
+  } = useSearchPieces(filters, searchEnabled);
 
   // Resetear a página 1 cuando cambien los resultados
   useEffect(() => {
     setCurrentPage(1);
   }, [results.length, itemsPerPage]);
 
-  const loadOptions = async () => {
-    try {
-      const params = new URLSearchParams();
-      if (filters.tipo) params.append('TIPO', filters.tipo);
-      if (filters.fabricante) params.append('FABRICANTE', filters.fabricante);
-      if (filters.cabeza) params.append('CABEZA', filters.cabeza);
-      if (filters.parte) params.append('PARTE_DIVISION', filters.parte);
-      if (filters.cuerpo) params.append('CUERPO', filters.cuerpo);
-      if (filters.tramo) params.append('TRAMO', filters.tramo);
-
-      const response = await fetch(`/api/options?${params}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setOptions(data.options);
-      }
-    } catch (error) {
-      console.error('Error loading options:', error);
-    }
-  };
-
-  
   const handleFilterChange = (filterName: string, value: string) => {
     setFilters(prev => ({
       ...prev,
       [filterName]: value
     }));
+    setSearchEnabled(false); // Resetear búsqueda al cambiar filtros
   };
 
-
-
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setMessage('Buscando materiales...');
-    
-    try {
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
-      });
-
-      const response = await fetch(`/api/search?${params}`);
-      const data = await response.json();
-      
-      if (data.success) {
-        setResults(data.results);
-        setMessage(data.results.length > 0 ? `✅ ${data.count} piezas encontradas` : '⚠️ No se encontraron resultados');
-      } else {
-        setMessage(`❌ Error: ${data.message}`);
-      }
-    } catch (error) {
-      setMessage(`🚨 Error de conexión: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    } finally {
-      setLoading(false);
-    }
+    setSearchEnabled(true); // Activar búsqueda
   };
 
   const handleViewPlano = (plano: string, modPlano: string, itemId: string) => {
@@ -151,7 +98,18 @@ export default function BuscadorPage() {
   }; 
 
   const handleUploadSuccess = () => {
-    window.location.reload();
+    // TanStack Query invalidará automáticamente el caché
+    // No necesitamos reload manual
+    setUploadModalOpen(false);
+  };
+
+  // Mensaje de estado
+  const getMessage = () => {
+    if (searchLoading || searchFetching) return '⏳ Buscando materiales...';
+    if (searchError) return `❌ Error: ${searchError.message}`;
+    if (searchEnabled && results.length > 0) return `✅ ${results.length} piezas encontradas`;
+    if (searchEnabled && results.length === 0) return '⚠️ No se encontraron resultados';
+    return 'Seleccione filtros y presione Buscar';
   };
 
   // Calcular datos paginados
@@ -162,7 +120,6 @@ export default function BuscadorPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    // Scroll deshabilitado - el usuario mantiene su posición actual
   };
 
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
@@ -208,40 +165,84 @@ export default function BuscadorPage() {
 
         {/* Panel de Filtros (Glass Card) */}
         <form onSubmit={handleSearch} className="glass-card p-8 rounded-2xl mb-8">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5 mb-8">
-            <FilterSelect label="TIPO" value={filters.tipo} options={options.TIPO} onChange={(v) => handleFilterChange('tipo', v)} />
-            <FilterSelect label="FABRICANTE" value={filters.fabricante} options={options.FABRICANTE} onChange={(v) => handleFilterChange('fabricante', v)} />
-            <FilterSelect label="CABEZA" value={filters.cabeza} options={options.CABEZA} onChange={(v) => handleFilterChange('cabeza', v)} />
-            <FilterSelect label="PARTE" value={filters.parte} options={options.PARTE_DIVISION} onChange={(v) => handleFilterChange('parte', v)} />
-            <FilterSelect label="CUERPO" value={filters.cuerpo} options={options.CUERPO} onChange={(v) => handleFilterChange('cuerpo', v)} />
-            <FilterSelect label="TRAMO" value={filters.tramo} options={options.TRAMO} onChange={(v) => handleFilterChange('tramo', v)} />
-          </div>
+          {optionsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#003594]"></div>
+              <span className="ml-4 text-gray-600">Cargando opciones...</span>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5 mb-8">
+                <FilterSelect 
+                  label="TIPO" 
+                  value={filters.tipo} 
+                  options={options?.TIPO || []} 
+                  onChange={(v) => handleFilterChange('tipo', v)} 
+                />
+                <FilterSelect 
+                  label="FABRICANTE" 
+                  value={filters.fabricante} 
+                  options={options?.FABRICANTE || []} 
+                  onChange={(v) => handleFilterChange('fabricante', v)} 
+                />
+                <FilterSelect 
+                  label="CABEZA" 
+                  value={filters.cabeza} 
+                  options={options?.CABEZA || []} 
+                  onChange={(v) => handleFilterChange('cabeza', v)} 
+                />
+                <FilterSelect 
+                  label="PARTE" 
+                  value={filters.parte} 
+                  options={options?.PARTE_DIVISION || []} 
+                  onChange={(v) => handleFilterChange('parte', v)} 
+                />
+                <FilterSelect 
+                  label="CUERPO" 
+                  value={filters.cuerpo} 
+                  options={options?.CUERPO || []} 
+                  onChange={(v) => handleFilterChange('cuerpo', v)} 
+                />
+                <FilterSelect 
+                  label="TRAMO" 
+                  value={filters.tramo} 
+                  options={options?.TRAMO || []} 
+                  onChange={(v) => handleFilterChange('tramo', v)} 
+                />
+              </div>
 
-          <div className="flex justify-center">
-             <button
-              type="submit"
-              disabled={loading}
-              className="btn-shine w-full md:w-1/3 py-4 px-8 bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] text-white font-bold rounded-xl transition duration-300 shadow-lg hover:shadow-blue-900/40 disabled:opacity-50 flex justify-center items-center gap-3 text-lg"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Buscando...
-                </>
-              ) : (
-                <>🔍 Buscar Desglose</>
-              )}
-            </button>
-          </div>
+              <div className="flex justify-center">
+                <button
+                  type="submit"
+                  disabled={searchLoading}
+                  className="btn-shine w-full md:w-1/3 py-4 px-8 bg-gradient-to-br from-[#001837] via-[#002856] to-[#00356e] text-white font-bold rounded-xl transition duration-300 shadow-lg hover:shadow-blue-900/40 disabled:opacity-50 flex justify-center items-center gap-3 text-lg"
+                >
+                  {searchLoading ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Buscando...
+                    </>
+                  ) : (
+                    <>🔍 Buscar Desglose</>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
         </form>
 
         {/* Mensaje de Estado */}
         <div className="mb-4 flex items-center gap-3 px-2">
-          <div className={`h-4 w-4 rounded-full shadow-inner ${message.includes('✅') ? 'bg-green-500' : message.includes('❌') ? 'bg-red-500' : 'bg-gray-400'}`}></div>
-          <p className="font-semibold text-gray-800 text-lg drop-shadow-sm">{message}</p>
+          <div className={`h-4 w-4 rounded-full shadow-inner ${
+            getMessage().includes('✅') ? 'bg-green-500' : 
+            getMessage().includes('❌') ? 'bg-red-500' : 
+            (searchLoading || searchFetching) ? 'bg-yellow-500 animate-pulse' :
+            'bg-gray-400'
+          }`}></div>
+          <p className="font-semibold text-gray-800 text-lg drop-shadow-sm">{getMessage()}</p>
         </div>
 
         {/* Tabla de Resultados (Semi-transparente) */}
@@ -259,7 +260,7 @@ export default function BuscadorPage() {
                 {currentResults.length === 0 ? (
                   <tr>
                     <td colSpan={15} className="px-6 py-12 text-center text-gray-500 font-medium italic bg-white/40">
-                      No hay resultados para mostrar. Ajusta los filtros arriba.
+                      {searchEnabled ? 'No hay resultados para mostrar. Ajusta los filtros arriba.' : 'Presiona "Buscar Desglose" para ver resultados'}
                     </td>
                   </tr>
                 ) : (
