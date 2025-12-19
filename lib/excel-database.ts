@@ -420,15 +420,6 @@ function parseNumber(value: any): number {
 export function getOptions(filters: Record<string, string>): Record<string, string[]> {
   const data = loadExcelData();
   
-  let filteredData = data;
-  
-  if (filters.TIPO) filteredData = filteredData.filter(p => p.tipo === filters.TIPO);
-  if (filters.FABRICANTE) filteredData = filteredData.filter(p => p.fabricante === filters.FABRICANTE);
-  if (filters.CABEZA) filteredData = filteredData.filter(p => p.cabeza === filters.CABEZA);
-  if (filters.PARTE_DIVISION) filteredData = filteredData.filter(p => p.parte_division === filters.PARTE_DIVISION);
-  if (filters.CUERPO) filteredData = filteredData.filter(p => p.cuerpo === filters.CUERPO);
-  if (filters.TRAMO) filteredData = filteredData.filter(p => p.tramo === filters.TRAMO);
-  
   const uniqueValues = {
     TIPO: new Set<string>(),
     FABRICANTE: new Set<string>(),
@@ -438,13 +429,36 @@ export function getOptions(filters: Record<string, string>): Record<string, stri
     TRAMO: new Set<string>()
   };
   
-  filteredData.forEach(piece => {
-    if (piece.tipo && piece.tipo !== '-') uniqueValues.TIPO.add(piece.tipo);
-    if (piece.fabricante && piece.fabricante !== '-') uniqueValues.FABRICANTE.add(piece.fabricante);
-    if (piece.cabeza && piece.cabeza !== '-') uniqueValues.CABEZA.add(piece.cabeza);
-    if (piece.cuerpo && piece.cuerpo !== '-') uniqueValues.CUERPO.add(piece.cuerpo);
-    if (piece.parte_division && piece.parte_division !== '-') uniqueValues.PARTE_DIVISION.add(piece.parte_division);
-    if (piece.tramo && piece.tramo !== '-') uniqueValues.TRAMO.add(piece.tramo);
+  const fields = ['TIPO', 'FABRICANTE', 'CABEZA', 'PARTE_DIVISION', 'CUERPO', 'TRAMO'];
+  const fieldMapping: Record<string, keyof Piece> = {
+    TIPO: 'tipo',
+    FABRICANTE: 'fabricante',
+    CABEZA: 'cabeza',
+    PARTE_DIVISION: 'parte_division',
+    CUERPO: 'cuerpo',
+    TRAMO: 'tramo'
+  };
+  
+  // Para cada campo, obtener opciones sin auto-filtrarse
+  fields.forEach(field => {
+    let filteredData = data;
+    
+    // Aplicar todos los filtros EXCEPTO el del campo actual
+    fields.forEach(filterField => {
+      if (filterField !== field && filters[filterField]) {
+        const propName = fieldMapping[filterField];
+        filteredData = filteredData.filter(p => p[propName] === filters[filterField]);
+      }
+    });
+    
+    // Recolectar valores únicos del campo
+    const propName = fieldMapping[field];
+    filteredData.forEach(piece => {
+      const value = piece[propName];
+      if (value && value !== '-') {
+        uniqueValues[field as keyof typeof uniqueValues].add(String(value));
+      }
+    });
   });
   
   return {
@@ -573,15 +587,6 @@ export async function searchPiecesAsync(filters: Record<string, string>): Promis
 export async function getOptionsAsync(filters: Record<string, string>): Promise<Record<string, string[]>> {
   const data = await loadExcelDataAsync();
   
-  let filteredData = data;
-  
-  if (filters.TIPO) filteredData = filteredData.filter(p => p.tipo === filters.TIPO);
-  if (filters.FABRICANTE) filteredData = filteredData.filter(p => p.fabricante === filters.FABRICANTE);
-  if (filters.CABEZA) filteredData = filteredData.filter(p => p.cabeza === filters.CABEZA);
-  if (filters.PARTE_DIVISION) filteredData = filteredData.filter(p => p.parte_division === filters.PARTE_DIVISION);
-  if (filters.CUERPO) filteredData = filteredData.filter(p => p.cuerpo === filters.CUERPO);
-  if (filters.TRAMO) filteredData = filteredData.filter(p => p.tramo === filters.TRAMO);
-  
   const uniqueValues = {
     TIPO: new Set<string>(),
     FABRICANTE: new Set<string>(),
@@ -591,13 +596,33 @@ export async function getOptionsAsync(filters: Record<string, string>): Promise<
     TRAMO: new Set<string>()
   };
   
-  filteredData.forEach(piece => {
-    if (piece.tipo && piece.tipo !== '-') uniqueValues.TIPO.add(piece.tipo);
-    if (piece.fabricante && piece.fabricante !== '-') uniqueValues.FABRICANTE.add(piece.fabricante);
-    if (piece.cabeza && piece.cabeza !== '-') uniqueValues.CABEZA.add(piece.cabeza);
-    if (piece.cuerpo && piece.cuerpo !== '-') uniqueValues.CUERPO.add(piece.cuerpo);
-    if (piece.parte_division && piece.parte_division !== '-') uniqueValues.PARTE_DIVISION.add(piece.parte_division);
-    if (piece.tramo && piece.tramo !== '-') uniqueValues.TRAMO.add(piece.tramo);
+  const fields = ['TIPO', 'FABRICANTE', 'CABEZA', 'PARTE_DIVISION', 'CUERPO', 'TRAMO'];
+  const fieldMapping: Record<string, keyof Piece> = {
+    TIPO: 'tipo',
+    FABRICANTE: 'fabricante',
+    CABEZA: 'cabeza',
+    PARTE_DIVISION: 'parte_division',
+    CUERPO: 'cuerpo',
+    TRAMO: 'tramo'
+  };
+  
+  fields.forEach(field => {
+    let filteredData = data;
+    
+    fields.forEach(filterField => {
+      if (filterField !== field && filters[filterField]) {
+        const propName = fieldMapping[filterField];
+        filteredData = filteredData.filter(p => p[propName] === filters[filterField]);
+      }
+    });
+    
+    const propName = fieldMapping[field];
+    filteredData.forEach(piece => {
+      const value = piece[propName];
+      if (value && value !== '-') {
+        uniqueValues[field as keyof typeof uniqueValues].add(String(value));
+      }
+    });
   });
   
   return {
