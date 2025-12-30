@@ -39,9 +39,16 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(0.08, Math.min(5, scale * delta));
-    setScale(newScale);
+    
+    if (e.deltaY > 0) {
+      // Zoom out: volver al centro
+      const newScale = Math.max(0.08, scale * 0.9);
+      setScale(newScale);
+      setPosition({ x: 0, y: 0 });
+    } else {
+      // Zoom in: mantener posición actual
+      setScale(prev => Math.min(5, prev * 1.1));
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -72,7 +79,9 @@ export default function PlanoViewer({ planoUrl, planoName, onClose }: PlanoViewe
   };
 
   const handleZoomOut = () => {
-    setScale(prev => Math.max(0.08, prev / 1.2));
+    const newScale = Math.max(0.08, scale / 1.2);
+    setScale(newScale);
+    setPosition({ x: 0, y: 0 });
   };
 
   const handleFitToScreen = () => {
